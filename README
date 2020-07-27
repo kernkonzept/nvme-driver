@@ -1,0 +1,6 @@
+Hard disk driver for devices with an NVMe-capable controller
+
+The driver has two parts. On one side there is the hardware driver itself
+that communicates with the hardware and provides the interrupt handling.
+On the other side a VIRTIO interface has been implemented for client-side
+communication.
