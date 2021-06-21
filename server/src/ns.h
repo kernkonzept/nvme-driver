@@ -64,7 +64,8 @@ public:
                                     Sgl_desc **sglp) const;
   Queue::Sqe *readwrite_prepare_prp(bool read, l4_uint64_t slba,
                                     l4_uint64_t paddr, l4_size_t sz) const;
-  void readwrite_submit(Queue::Sqe *sqe, l4_uint16_t nlb, Callback cb) const;
+  void readwrite_submit(Queue::Sqe *sqe, l4_uint16_t nlb, l4_size_t blocks,
+                        Callback cb) const;
 
   bool write_zeroes(l4_uint64_t slba, l4_uint16_t nlb, bool dealloc, Callback cb) const;
 

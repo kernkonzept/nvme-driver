@@ -118,10 +118,11 @@ Namespace::readwrite_prepare_sgl(bool read, l4_uint64_t slba,
 }
 
 void
-Namespace::readwrite_submit(Queue::Sqe *sqe, l4_uint16_t nlb, Callback cb) const
+Namespace::readwrite_submit(Queue::Sqe *sqe, l4_uint16_t nlb, l4_size_t blocks,
+                            Callback cb) const
 {
   if (sqe->psdt() == Psdt::Use_sgls)
-    sqe->sgl1.len = nlb * sizeof(Sgl_desc);
+    sqe->sgl1.len = blocks * sizeof(Sgl_desc);
   sqe->nlb() = nlb;
   _iosq->_callbacks[sqe->cid()] = cb;
   _iosq->submit();

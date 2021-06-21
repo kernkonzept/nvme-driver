@@ -22,6 +22,7 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
 {
   Queue::Sqe *sqe;
   l4_size_t sectors = 0;
+  l4_size_t blocks = 0;
   bool read = (dir == L4Re::Dma_space::Direction::From_device ? true : false);
   if (_ns->ctl().supports_sgl())
     {
@@ -36,6 +37,7 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
       for (auto i = 0u; b && i < Queue::Ioq_sgls; i++, b = b->next.get())
         {
           sectors += b->num_sectors;
+          ++blocks;
           sgls[i].sgl_id = Sgl_id::Data;
           sgls[i].addr = b->dma_addr;
           sgls[i].len = b->num_sectors * sector_size();
@@ -46,6 +48,7 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
       // Fallback to using PRPs
       sectors =
         std::min((l4_size_t)block.num_sectors, max_size() / sector_size());
+      ++blocks;
       sqe = _ns->readwrite_prepare_prp(read, sector, block.dma_addr,
                                        sectors * sector_size());
       if (!sqe)
@@ -55,9 +58,10 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
   // XXX: defer running of the callback to an Errand like the ahci-driver does?
   l4_size_t sz = sectors * sector_size();
   Block_device::Inout_callback callback = cb; // capture a copy
-  _ns->readwrite_submit(sqe, sectors - 1, [callback, sz](l4_uint16_t status) {
-    callback(status ? -L4_EIO : L4_EOK, status ? 0 : sz);
-  });
+  _ns->readwrite_submit(sqe, sectors - 1, blocks,
+                        [callback, sz](l4_uint16_t status) {
+                          callback(status ? -L4_EIO : L4_EOK, status ? 0 : sz);
+                        });
 
   return L4_EOK;
 }
