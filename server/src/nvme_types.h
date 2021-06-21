@@ -96,8 +96,8 @@ enum Psdt
 
 enum Sgl_id
 {
-  Data = 0u,         ///< SGL Data Block descriptor with address
-  Last_segment = 3u, ///< SGL Last Segment descriptor with address
+  Data = 0u,                 ///< SGL Data Block descriptor with address
+  Last_segment_addr = 0x30u, ///< SGL Last Segment descriptor with address
 };
 
 /** SGL descriptor */

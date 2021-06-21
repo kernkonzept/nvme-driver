@@ -106,7 +106,7 @@ Namespace::readwrite_prepare_sgl(bool read, l4_uint64_t slba,
   sqe->opc() = (read ? Iocs::Read : Iocs::Write);
   sqe->nsid = _nsid;
   sqe->psdt() = Psdt::Use_sgls;
-  sqe->sgl1.sgl_id = Sgl_id::Last_segment;
+  sqe->sgl1.sgl_id = Sgl_id::Last_segment_addr;
   sqe->sgl1.addr = _iosq->_sgls->pget(sqe->cid() * Queue::Ioq_sgls);
   sqe->cdw10 = slba & 0xfffffffful;
   sqe->cdw11 = slba >> 32;
