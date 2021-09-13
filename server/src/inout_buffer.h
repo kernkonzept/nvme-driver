@@ -16,8 +16,6 @@
 #include <stdio.h>
 #include <cassert>
 
-#include <l4/libblock-device/device.h>
-
 namespace Nvme {
 
 class Inout_buffer : public cxx::Ref_obj
@@ -29,11 +27,11 @@ public:
                L4Re::Rm::Flags flags = L4Re::Rm::Flags(0))
   : _size(size), _dma(dma), _paddr(0), _dir(dir)
   {
-    auto lcap = L4Re::chkcap(L4Re::Util::make_unique_cap<L4Re::Dataspace>(),
-                             "Allocate dataspace capability for IO memory.");
+    _ds = L4Re::chkcap(L4Re::Util::make_unique_cap<L4Re::Dataspace>(),
+                       "Allocate dataspace capability for IO memory.");
 
     auto *e = L4Re::Env::env();
-    L4Re::chksys(e->mem_alloc()->alloc(size, lcap.get(),
+    L4Re::chksys(e->mem_alloc()->alloc(size, _ds.get(),
                                        L4Re::Mem_alloc::Continuous
                                        | L4Re::Mem_alloc::Pinned),
                  "Allocate pinned memory.");
@@ -41,15 +39,12 @@ public:
     L4Re::chksys(
       e->rm()->attach(&_region, size,
                       L4Re::Rm::F::Search_addr | L4Re::Rm::F::RW | flags,
-                      L4::Ipc::make_cap_rw(lcap.get()), 0, L4_PAGESHIFT),
+                      L4::Ipc::make_cap_rw(_ds.get()), 0, L4_PAGESHIFT),
       "Attach IO memory.");
 
-    _mem_region =
-      cxx::make_unique<Block_device::Mem_region>(0, size, 0, cxx::move(lcap));
     l4_size_t out_size = size;
-    L4Re::chksys(_dma->map(L4::Ipc::make_cap_rw(_mem_region->ds()), 0,
-                           &out_size, L4Re::Dma_space::Attributes::None, dir,
-                           &_paddr),
+    L4Re::chksys(_dma->map(L4::Ipc::make_cap_rw(_ds.get()), 0, &out_size,
+                           L4Re::Dma_space::Attributes::None, dir, &_paddr),
                  "Lock memory region for DMA.");
     if (out_size < size)
       L4Re::chksys(-L4_ENOMEM, "Mapping whole region into DMA space");
@@ -85,7 +80,7 @@ public:
 private:
   l4_size_t _size;
   L4Re::Util::Shared_cap<L4Re::Dma_space> _dma;
-  cxx::unique_ptr<Block_device::Mem_region> _mem_region;
+  L4Re::Util::Unique_cap<L4Re::Dataspace> _ds;
   L4Re::Rm::Unique_region<char *> _region;
   L4Re::Dma_space::Dma_addr _paddr;
   L4Re::Dma_space::Direction _dir;
