@@ -69,7 +69,9 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
 int
 Nvme::Nvme_device::flush(Block_device::Inout_callback const &cb)
 {
-  // TODO: flush the internal caches before completing the FLUSH
+  // The NVMe driver does not enable the Volatile Write Cache in the controller
+  // (if present) and neither it nor libblock-device implements a software block
+  // cache, so there is nothing to flush at this point.
   cb(0, 0);
   return L4_EOK;
 }
