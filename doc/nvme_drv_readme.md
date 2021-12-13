@@ -1,31 +1,31 @@
-# NVMe driver   {#l4re_servers_nvme_driver}
+# NVMe server   {#l4re_servers_nvme_driver}
 
-The NVMe driver is a driver for PCI Express NVMe controllers.
+The NVMe server is a driver for PCI Express NVMe controllers.
 
-The NVMe driver is capable of exposing entire disks (i.e. NVMe namespaces) (by
+The NVMe server is capable of exposing entire disks (i.e. NVMe namespaces) (by
 serial number and namespace identifier) or individual partitions (by their
 partition UUID) of a hard drive to clients via the Virtio block interface.
 
-The driver consists of two parts. The first one is the hardware driver itself
+The server consists of two parts. The first one is the hardware driver itself
 that takes care of the communication with the underlying hardware and interrupt
 handling. The second part implements a virtual block device and is responsible
 to communicate with clients. The virtual block device translates commands it
 receives into NVMe requests and issues them to the hardware driver.
 
-The NVMe driver allows both statically and dynamically configured clients. A
+The NVMe server allows both statically and dynamically configured clients. A
 static configuration is given priority over dynamically connecting clients and
 configured while the service starts. Dynamic clients can connect and disconnect
-during runtime of the NVMe driver.
+during runtime of the NVMe server.
 
 ## Building and Configuration
 
-The NVMe driver can be built using the L4Re build system. Just place
+The NVMe server can be built using the L4Re build system. Just place
 this project into your `pkg` directory. The resulting binary is called
 `nvme-drv`
 
 ## Starting the service
 
-The NVMe driver can be started with Lua like this:
+The NVMe server can be started with Lua like this:
 
     local nvme_bus = L4.default_loader:new_channel();
     L4.default_loader:start({
@@ -36,19 +36,19 @@ The NVMe driver can be started with Lua like this:
     },
     "rom/nvme-drv");
 
-First an IPC gate (`nvme_bus`) is created which is used between the NVMe driver
+First an IPC gate (`nvme_bus`) is created which is used between the NVMe server
 and a client to request access to a particular disk or partition. The
-server-side is assigned to the mandatory `svr` capability of the NVMe driver.
+server-side is assigned to the mandatory `svr` capability of the NVMe server.
 See the section below on how to configure access to a disk or partition.
 
-The nvme driver needs access to a virtual bus capability (`vbus`). On the
-virtual bus the NVMe driver searches for NVMe compliant storage controllers.
+The NVMe server needs access to a virtual bus capability (`vbus`). On the
+virtual bus the NVMe server searches for NVMe compliant storage controllers.
 Please see io's documentation about how to setup a virtual bus.
 
 ### Options
 
-In the example above the nvme driver is started in its default configuration.
-To customize the configuration of the nvme-driver it accepts the following
+In the example above the NVMe server is started in its default configuration.
+To customize the configuration of the NVMe-server it accepts the following
 command line options:
 
 * `-v`
@@ -78,7 +78,7 @@ command line options:
 * `--ds-max <max>`
 
   This option sets the upper limit of the number of dataspaces the client is
-  able to register with the NVMe driver for virtio DMA.
+  able to register with the NVMe server for virtio DMA.
 
 * `--readonly`
 
@@ -94,13 +94,13 @@ command line options:
 
 Prior to connecting a client to a virtual block session it has to be created
 using the following Lua function. It has to be called on the client side of the
-IPC gate capability whose server side is bound to the nvme driver.
+IPC gate capability whose server side is bound to the NVMe server.
 
     create(obj_type, "device=<UUID | SN:n<NAMESPACE_ID>>", "ds-max=<max>")
 
 * `obj_type`
 
-  The type of object that should be created by the driver. The type must be a
+  The type of object that should be created by the server. The type must be a
   positive integer. Currently the following objects are supported:
   * `0`: Virtio block host
 
@@ -113,11 +113,11 @@ IPC gate capability whose server side is bound to the nvme driver.
 * `"ds-max=<max>"`
 
   Specifies the upper limit of the number of dataspaces the client is allowed
-  to register with the NVMe driver for virtio DMA.
+  to register with the NVMe server for virtio DMA.
 
 If the `create()` call is successful a new capability which references an NVMe
-virtio driver is returned. A client uses this capability to communicate with
-the NVMe driver using the Virtio block protocol.
+virtio device is returned. A client uses this capability to communicate with
+the NVMe server using the Virtio block protocol.
 
 ## Examples
 
@@ -133,7 +133,7 @@ below.
       vda = nvme_bus:create(0, "ds-max=4", "device=1234:n1")
 
 * A more elaborate example with a static client. The client uses the client
-  side of the `nvme_cl1` capability to communicate with the NVMe driver.
+  side of the `nvme_cl1` capability to communicate with the NVMe server.
 
       local nvme_cl1 = L4.default_loader:new_channel();
       local nvme_bus = L4.default_loader:new_channel();
