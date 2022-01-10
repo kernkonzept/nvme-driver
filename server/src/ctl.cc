@@ -155,15 +155,10 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
 void
 Ctl::handle_irq()
 {
-  Queue::Cqe volatile *cqe = _acq->consume();
-  if (cqe)
+  while (auto *cqe = _acq->consume())
     {
       assert(cqe->sqid() == Aq_id);
-      _asq->_head = cqe->sqhd();
-      assert(_asq->_callbacks[cqe->cid()]);
-      auto cb = _asq->_callbacks[cqe->cid()];
-      _asq->_callbacks[cqe->cid()] = nullptr;
-      cb(cqe->sf());
+      _asq->complete(cqe);
       _acq->complete();
     }
 
@@ -258,7 +253,7 @@ Ctl::create_iocq(l4_uint16_t id, l4_size_t size, unsigned iv, Callback cb)
   auto cq = cxx::make_unique<Queue::Completion_queue>(size, id, _cap.dstrd(),
                                                       _regs, _dma);
 
-  auto *sqe = _asq->produce();
+  auto *sqe = _asq->produce(std::move(cb));
   sqe->opc() = Acs::Create_iocq;
   sqe->nsid = 0;
   sqe->psdt() = Psdt::Use_prps;
@@ -269,7 +264,6 @@ Ctl::create_iocq(l4_uint16_t id, l4_size_t size, unsigned iv, Callback cb)
   sqe->iv() = _pci_dev->get_local_vector(iv);
   sqe->ien() = 1;
   sqe->pc() = 1;
-  _asq->_callbacks[sqe->cid()] = cb;
   _asq->submit();
 
   return cq;
@@ -333,7 +327,7 @@ Ctl::create_iosq(l4_uint16_t id, l4_size_t size, l4_size_t sgls, Callback cb)
   auto sq = cxx::make_unique<Queue::Submission_queue>(size, id, _cap.dstrd(),
                                                       _regs, _dma, sgls);
 
-  auto *sqe = _asq->produce();
+  auto *sqe = _asq->produce(std::move(cb));
   sqe->opc() = Acs::Create_iosq;
   sqe->nsid = 0;
   sqe->psdt() = Psdt::Use_prps;
@@ -344,7 +338,6 @@ Ctl::create_iosq(l4_uint16_t id, l4_size_t size, l4_size_t sgls, Callback cb)
   sqe->pc() = 1;
   sqe->cqid() = id;
   sqe->cdw12 = 0;
-  _asq->_callbacks[sqe->cid()] = cb;
   _asq->submit();
 
   return sq;
@@ -364,17 +357,7 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
   // namespaces.  We workaround that by implementing the for-loop within the
   // nesting structure of the callbacks.
 
-  auto *sqe = _asq->produce();
-  sqe->opc() = Acs::Identify;
-  sqe->nsid = n;
-  sqe->psdt() = Psdt::Use_prps;
-  sqe->prp.prp1 = in->pget();
-  sqe->prp.prp2 = 0;
-  sqe->cntid() = 0;
-  sqe->cns() = Cns::Identify_namespace;
-  sqe->nvmsetid() = 0;
-
-  auto cb = [this, in, nn, n, callback](l4_uint16_t status) {
+  auto cb = [=](l4_uint16_t status) {
     if (status)
       {
         printf("Namespace Identify command failed with status %u\n", status);
@@ -424,7 +407,15 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
       identify_namespace(nn, n + 1, callback);
   };
 
-  _asq->_callbacks[sqe->cid()] = cb;
+  auto *sqe = _asq->produce(cb);
+  sqe->opc() = Acs::Identify;
+  sqe->nsid = n;
+  sqe->psdt() = Psdt::Use_prps;
+  sqe->prp.prp1 = in->pget();
+  sqe->prp.prp2 = 0;
+  sqe->cntid() = 0;
+  sqe->cns() = Cns::Identify_namespace;
+  sqe->nvmsetid() = 0;
   _asq->submit();
 }
 
@@ -435,16 +426,7 @@ Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> callback)
     cxx::make_ref_obj<Inout_buffer>(4096, _dma,
                                     L4Re::Dma_space::Direction::From_device);
 
-  auto *sqe = _asq->produce();
-  sqe->opc() = Acs::Identify;
-  sqe->psdt() = Psdt::Use_prps;
-  sqe->prp.prp1 = ic->pget();
-  sqe->prp.prp2 = 0;
-  sqe->cntid() = 0;
-  sqe->cns() = Cns::Identify_controller;
-  sqe->nvmsetid() = 0;
-
-  auto cb = [this, callback, ic](l4_uint16_t status) {
+  auto cb = [=](l4_uint16_t status) {
     if (status)
       {
         trace.printf("Identify_controller command failed with status=%u\n", status);
@@ -480,7 +462,14 @@ Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> callback)
     identify_namespace(nn, 1, callback);
   };
 
-  _asq->_callbacks[sqe->cid()] = cb;
+  auto *sqe = _asq->produce(cb);
+  sqe->opc() = Acs::Identify;
+  sqe->psdt() = Psdt::Use_prps;
+  sqe->prp.prp1 = ic->pget();
+  sqe->prp.prp2 = 0;
+  sqe->cntid() = 0;
+  sqe->cns() = Cns::Identify_controller;
+  sqe->nvmsetid() = 0;
   _asq->submit();
 }
 

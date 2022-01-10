@@ -53,22 +53,18 @@ public:
     while (auto *cqe = _iocq->consume())
       {
         assert(cqe->sqid() == qid());
-        _iosq->_head = cqe->sqhd();
-        assert(_iosq->_callbacks[cqe->cid()]);
-        auto cb = _iosq->_callbacks[cqe->cid()];
-        _iosq->_callbacks[cqe->cid()] = nullptr;
-        cb(cqe->sf());
+        _iosq->complete(cqe);
         _iocq->complete();
       }
   }
 
   Queue::Sqe volatile *readwrite_prepare_sgl(bool read, l4_uint64_t slba,
-                                             Sgl_desc **sglp) const;
+                                             Sgl_desc **sglp, Callback cb) const;
   Queue::Sqe volatile *readwrite_prepare_prp(bool read, l4_uint64_t slba,
                                              l4_uint64_t paddr, l4_size_t sz,
-                                             Prp_list_entry **prpp) const;
-  void readwrite_submit(Queue::Sqe volatile *sqe, l4_uint16_t nlb, l4_size_t blocks,
-                        Callback cb) const;
+                                             Prp_list_entry **prpp, Callback cb) const;
+  void readwrite_submit(Queue::Sqe volatile *sqe, l4_uint16_t nlb,
+                        l4_size_t blocks) const;
 
   bool write_zeroes(l4_uint64_t slba, l4_uint16_t nlb, bool dealloc, Callback cb) const;
 

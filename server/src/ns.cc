@@ -85,9 +85,9 @@ Namespace::async_loop_init(
 
 Queue::Sqe volatile *
 Namespace::readwrite_prepare_prp(bool read, l4_uint64_t slba, l4_uint64_t paddr,
-                                 l4_size_t sz, Prp_list_entry **prpp) const
+                                 l4_size_t sz, Prp_list_entry **prpp, Callback cb) const
 {
-  auto *sqe = _iosq->produce();
+  auto *sqe = _iosq->produce(std::move(cb));
   if (!sqe)
     return 0;
 
@@ -117,34 +117,33 @@ Namespace::readwrite_prepare_prp(bool read, l4_uint64_t slba, l4_uint64_t paddr,
 
 Queue::Sqe volatile *
 Namespace::readwrite_prepare_sgl(bool read, l4_uint64_t slba,
-                                 Sgl_desc **sglp) const
+                                 Sgl_desc **sglp, Callback cb) const
 {
-  auto *sqe = _iosq->produce();
+  auto *sqe = _iosq->produce(std::move(cb));
   if (!sqe)
     return 0;
-  auto sgl_start = sqe->cid() * Queue::Ioq_sgls * sizeof(Sgl_desc);
+
   sqe->opc() = (read ? Iocs::Read : Iocs::Write);
   sqe->nsid = _nsid;
   sqe->psdt() = Psdt::Use_sgls;
   sqe->sgl1.sgl_id = Sgl_id::Last_segment_addr;
-  sqe->sgl1.addr = _iosq->_sgls->pget(sgl_start);
+  sqe->sgl1.addr = _iosq->sgls_paddr(sqe->cid());
   sqe->cdw10 = slba & 0xfffffffful;
   sqe->cdw11 = slba >> 32;
   sqe->cdw13 = 0;
   sqe->cdw14 = 0;
   sqe->cdw15 = 0;
-  *sglp = _iosq->_sgls->get<Sgl_desc>(sgl_start);
+  *sglp = _iosq->sgls_desc(sqe->cid());
   return sqe;
 }
 
 void
-Namespace::readwrite_submit(Queue::Sqe volatile *sqe, l4_uint16_t nlb, l4_size_t blocks,
-                            Callback cb) const
+Namespace::readwrite_submit(Queue::Sqe volatile *sqe, l4_uint16_t nlb,
+                            l4_size_t blocks) const
 {
   if (sqe->psdt() == Psdt::Use_sgls)
     sqe->sgl1.len = blocks * sizeof(Sgl_desc);
   sqe->nlb() = nlb;
-  _iosq->_callbacks[sqe->cid()] = cb;
   _iosq->submit();
 }
 
@@ -152,7 +151,7 @@ bool
 Namespace::write_zeroes(l4_uint64_t slba, l4_uint16_t nlb, bool dealloc,
                         Callback cb) const
 {
-  auto *sqe = _iosq->produce();
+  auto *sqe = _iosq->produce(std::move(cb));
   if (!sqe)
     return false;
 
@@ -164,7 +163,6 @@ Namespace::write_zeroes(l4_uint64_t slba, l4_uint16_t nlb, bool dealloc,
   sqe->deac() = dealloc;
   sqe->cdw14 = 0;
   sqe->cdw15 = 0;
-  _iosq->_callbacks[sqe->cid()] = cb;
   _iosq->submit();
   return true;
 }

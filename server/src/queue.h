@@ -153,23 +153,15 @@ protected:
 
 class Submission_queue : public Queue
 {
-  friend class Nvme::Ctl;
   friend class Nvme::Namespace;
-
 public:
   Submission_queue(l4_uint16_t size, unsigned y, unsigned dstrd,
                    L4drivers::Register_block<32> &regs,
                    L4Re::Util::Shared_cap<L4Re::Dma_space> const &dma,
                    l4_size_t sgls = 0)
   : Queue(size, y, dstrd, regs, dma, L4Re::Dma_space::Direction::To_device),
-    _tail(0)
+    _tail(0), _in_flight(0), _free_hint(0)
   {
-    for (auto i = 0u; i < size; i++)
-      {
-        Sqe volatile *sqe = _buf->get<Sqe>(i * _entry_size);
-        sqe->cid() = i;
-      }
-
     _callbacks.reserve(_size);
 
     if (sgls)
@@ -188,27 +180,54 @@ public:
 
   bool is_full() const { return _head == wrap_around(_tail + 1); }
 
-  Sqe volatile *produce()
+  Sqe *produce(Callback cb)
   {
-    if (is_full())
+    if (is_full() || _in_flight >= _size)
       return 0;
-    if (_callbacks[_tail])
-      {
-        // Need to wait for the callback to be finished first before we can
-        // use this entry again.
-        return 0;
-      }
-    Sqe volatile *sqe = _buf->get<Sqe>(_tail * _entry_size);
+
+    assert(cb);
+    _in_flight++;
+    l4_uint16_t cid = _free_hint;
+    while (_callbacks[cid])
+      cid = wrap_around(cid + 1);
+    _callbacks[cid] = std::move(cb);
+
+    Sqe *sqe = _buf->get<Sqe>(_tail * _entry_size);
     _tail = wrap_around(_tail + 1);
 
-    // Clear all but preserve the Command Identifier
-    unsigned cid = sqe->cid();
     memset((void *)sqe, 0, sizeof(*sqe));
     sqe->cid() = cid;
     return sqe;
   }
 
-  void submit() { _regs.r<32>(tdbl()).write(_tail); }
+  void submit()
+  {
+    _regs.r<32>(tdbl()).write(_tail);
+  }
+
+  void complete(Cqe volatile *cqe)
+  {
+    _head = cqe->sqhd();
+    _free_hint = cqe->cid();
+    assert(_in_flight);
+    _in_flight--;
+
+    auto cb = std::move(_callbacks[cqe->cid()]);
+    _callbacks[cqe->cid()] = nullptr;
+    assert(cb);
+
+    cb(cqe->sf());
+  }
+
+  l4_addr_t sgls_paddr(l4_uint16_t cid)
+  {
+    return _sgls->pget((unsigned)cid * Ioq_sgls * sizeof(Sgl_desc));
+  }
+
+  Sgl_desc *sgls_desc(l4_uint16_t cid)
+  {
+    return _sgls->get<Sgl_desc>((unsigned)cid * Ioq_sgls * sizeof(Sgl_desc));
+  }
 
 private:
   std::vector<std::function<void(l4_uint16_t)>> _callbacks;
@@ -218,6 +237,8 @@ private:
   unsigned tdbl() const { return 0x1000 + ((2 * _y) * (4 << _dstrd)); }
 
   l4_uint16_t _tail;
+  l4_uint16_t _in_flight;
+  l4_uint16_t _free_hint;
 };
 
 

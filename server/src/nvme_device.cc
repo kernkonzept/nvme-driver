@@ -22,28 +22,37 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
   Queue::Sqe volatile *sqe;
   l4_size_t sectors = 0;
   l4_size_t blocks = 0;
-  l4_size_t sz;
   bool read = (dir == L4Re::Dma_space::Direction::From_device ? true : false);
+  Block_device::Inout_callback callback = cb; // capture a copy
+
   if (_ns->ctl().supports_sgl())
     {
-      Sgl_desc *sgls;
-      sqe = _ns->readwrite_prepare_sgl(read, sector, &sgls);
-
-      if (!sqe)
-        return -L4_EBUSY;
-
-      // Construct the SGL
+      // Determine request size
       auto *b = &block;
       for (auto i = 0u; b && i < Queue::Ioq_sgls; i++, b = b->next.get())
         {
           sectors += b->num_sectors;
           ++blocks;
+        }
+      l4_size_t sz = sectors * sector_size();
+
+      auto sgl_cb = [callback, sz](l4_uint16_t status) {
+        callback(status ? -L4_EIO : L4_EOK, status ? 0 : sz);
+      };
+      Sgl_desc *sgls;
+      sqe = _ns->readwrite_prepare_sgl(read, sector, &sgls, sgl_cb);
+
+      if (!sqe)
+        return -L4_EBUSY;
+
+      // Construct the SGL
+      b = &block;
+      for (l4_size_t i = 0; i < blocks; i++, b = b->next.get())
+        {
           sgls[i].sgl_id = Sgl_id::Data;
           sgls[i].addr = b->dma_addr;
           sgls[i].len = b->num_sectors * sector_size();
         }
-
-      sz = sectors * sector_size();
     }
   else
     {
@@ -56,9 +65,11 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
       sectors =
         std::min((l4_size_t)block.num_sectors, max_size() / sector_size());
       ++blocks;
-      sz = sectors * sector_size();
-      sqe = _ns->readwrite_prepare_prp(read, sector, block.dma_addr, sz, &prps);
-
+      l4_size_t sz = sectors * sector_size();
+      auto prp_cb = [callback, sz](l4_uint16_t status) {
+        callback(status ? -L4_EIO : L4_EOK, status ? 0 : sz);
+      };
+      sqe = _ns->readwrite_prepare_prp(read, sector, block.dma_addr, sz, &prps, prp_cb);
       if (!sqe)
         return -L4_EBUSY;
 
@@ -93,11 +104,7 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
     }
 
   // XXX: defer running of the callback to an Errand like the ahci-driver does?
-  Block_device::Inout_callback callback = cb; // capture a copy
-  _ns->readwrite_submit(sqe, sectors - 1, blocks,
-                        [callback, sz](l4_uint16_t status) {
-                          callback(status ? -L4_EIO : L4_EOK, status ? 0 : sz);
-                        });
+  _ns->readwrite_submit(sqe, sectors - 1, blocks);
 
   return L4_EOK;
 }
