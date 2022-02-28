@@ -113,8 +113,9 @@ Ctl::handle_irq()
       assert(cqe->sqid() == Aq_id);
       _asq->_head = cqe->sqhd();
       assert(_asq->_callbacks[cqe->cid()]);
-      _asq->_callbacks[cqe->cid()](cqe->sf());
+      auto cb = _asq->_callbacks[cqe->cid()];
       _asq->_callbacks[cqe->cid()] = nullptr;
+      cb(cqe->sf());
       _acq->complete();
     }
 

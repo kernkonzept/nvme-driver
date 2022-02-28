@@ -54,8 +54,9 @@ public:
         assert(cqe->sqid() == qid());
         _iosq->_head = cqe->sqhd();
         assert(_iosq->_callbacks[cqe->cid()]);
-        _iosq->_callbacks[cqe->cid()](cqe->sf());
+        auto cb = _iosq->_callbacks[cqe->cid()];
         _iosq->_callbacks[cqe->cid()] = nullptr;
+        cb(cqe->sf());
         _iocq->complete();
       }
   }
