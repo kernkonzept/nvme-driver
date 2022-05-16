@@ -83,6 +83,7 @@ Nvme::Nvme_device::discard(l4_uint64_t offset,
 {
   l4_assert(!discard);
   l4_assert(!block.next.get());
+  (void)discard;
 
   Block_device::Inout_callback callback = cb; // capture a copy
   bool sub = _ns->write_zeroes(offset + block.sector, block.num_sectors - 1,
