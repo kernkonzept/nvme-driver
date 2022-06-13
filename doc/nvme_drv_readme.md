@@ -102,7 +102,7 @@ Prior to connecting a client to a virtual block session it has to be created
 using the following Lua function. It has to be called on the client side of the
 IPC gate capability whose server side is bound to the NVMe server.
 
-    create(obj_type, "device=<UUID | SN:n<NAMESPACE_ID>>", "ds-max=<max>")
+    create(obj_type, "device=<UUID | SN:n<NAMESPACE_ID>>", "ds-max=<max>", "read-only")
 
 * `obj_type`
 
@@ -120,6 +120,11 @@ IPC gate capability whose server side is bound to the NVMe server.
 
   Specifies the upper limit of the number of dataspaces the client is allowed
   to register with the NVMe server for virtio DMA.
+
+* `"read-only"`
+
+  This string sets the access to disks or partitions to read only for the
+  client.
 
 If the `create()` call is successful a new capability which references an NVMe
 virtio device is returned. A client uses this capability to communicate with
