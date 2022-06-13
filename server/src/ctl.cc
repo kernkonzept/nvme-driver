@@ -35,7 +35,7 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev,
          L4Re::Util::Shared_cap<L4Re::Dma_space> const &dma)
 : _dev(dev),
   _dma(dma),
-  _iomem(cfg_read_bar(),
+  _iomem(cfg_read_bar(), Regs::Ctl::Sq0tdbl + 1,
          L4::cap_reinterpret_cast<L4Re::Dataspace>(_dev.bus_cap())),
   _regs(new L4drivers::Mmio_register_block<32>(_iomem.vaddr.get())),
   _cap(_regs.r<32>(Regs::Ctl::Cap).read()

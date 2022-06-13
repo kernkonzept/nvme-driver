@@ -27,6 +27,7 @@
 #include "queue.h"
 #include "ns.h"
 #include "inout_buffer.h"
+#include "iomem.h"
 
 #include <l4/libblock-device/device.h>
 
@@ -39,23 +40,6 @@ namespace Nvme {
  */
 class Ctl : public L4::Irqep_t<Ctl>
 {
-  /**
-   * Self-attaching IO memory.
-   */
-  struct Iomem
-  {
-    L4Re::Rm::Unique_region<l4_addr_t> vaddr;
-
-    Iomem(l4_addr_t phys_addr, L4::Cap<L4Re::Dataspace> iocap)
-    {
-      L4Re::chksys(L4Re::Env::env()->rm()->attach(
-        &vaddr, l4_round_page(Regs::Ctl::Sq0tdbl + 1),
-        L4Re::Rm::F::Search_addr | L4Re::Rm::F::Cache_uncached
-          | L4Re::Rm::F::RW,
-        L4::Ipc::make_cap_rw(iocap), phys_addr, L4_PAGESHIFT));
-    }
- };
-
 public:
   /**
    * Create a new NVMe controller from a vbus PCI device.
