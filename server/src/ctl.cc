@@ -25,15 +25,26 @@
 #include "debug.h"
 #include "queue.h"
 
+#include "pci.h"
+#include "icu.h"
+
+#include <l4/util/util.h>
+
 static Dbg trace(Dbg::Trace, "ctl");
 
 namespace Nvme {
 
 bool Ctl::use_sgls = true;
+bool Ctl::use_msis = true;
+bool Ctl::use_msixs = true;
 
-Ctl::Ctl(L4vbus::Pci_dev const &dev,
+Ctl::Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
+         L4Re::Util::Object_registry *registry,
          L4Re::Util::Shared_cap<L4Re::Dma_space> const &dma)
 : _dev(dev),
+  _pci_dev(cxx::make_unique<Nvme::Pci_dev>(dev)),
+  _icu(icu),
+  _registry(registry),
   _dma(dma),
   _iomem(cfg_read_bar(), Regs::Ctl::Sq0tdbl + 1,
          L4::cap_reinterpret_cast<L4Re::Dataspace>(_dev.bus_cap())),
@@ -51,10 +62,31 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev,
   else
     L4Re::chksys(-L4_ENOSYS, "Controller does not support NVM command set");
 
+  // Configure PCI / PCI Express registers
+  //
+  // This step needs to be done before enabling the controller.
+  _pci_dev->detect_msi_support();
+  if (_icu->msis_supported())
+    {
+      if (Ctl::use_msixs && _pci_dev->msixs_supported())
+        _pci_dev->enable_msix_pci();
+      else if (Ctl::use_msis && _pci_dev->msis_supported())
+        _pci_dev->enable_msi_pci();
+    }
+
   // Start by resetting the controller, mostly to get the admin queue doorbell
   // registers to a known state.
   Ctl_cc cc(0);
-  _regs.r<32>(Regs::Ctl::Cc).write(cc.raw);
+  if (Ctl_csts(_regs.r<32>(Regs::Ctl::Csts).read()).rdy())
+    {
+      _regs.r<32>(Regs::Ctl::Cc).write(cc.raw);
+      cc.raw = _regs.r<32>(Regs::Ctl::Cc).read();
+      // A short delay seems to be necessary for some controllers:
+      // - 0x15b7 0x5011 Sandisk Corp WD PC SN810 / Black SN850 NVMe SSD
+      l4_sleep(1);
+    }
+  else
+    trace.printf("The controller was not enabled, not disabling.\n");
 
   // Set the admin queues' sizes
   Ctl_aqa aqa(0);
@@ -128,43 +160,88 @@ Ctl::handle_irq()
 
 
 void
-Ctl::register_interrupt_handler(L4::Cap<L4::Icu> icu,
-                                L4Re::Util::Object_registry *registry)
+Ctl::register_interrupt_handler()
 {
-  // find the interrupt
-  unsigned char polarity;
-  int irq = L4Re::chksys(_dev.irq_enable(&_irq_trigger_type, &polarity),
-                         "Enabling interrupt.");
+  // check if the ICU supports MSIs
+  l4_icu_info_t icu_info;
+  L4Re::chksys(l4_error(_icu->icu()->info(&icu_info)), "Retrieving ICU infos");
 
-  Dbg::info().printf("Device: interrupt : %d trigger: %d, polarity: %d\n",
+  Dbg::info().printf("ICU info: features=%x #Irqs=%u, #MSIs=%u\n",
+                      icu_info.features, icu_info.nr_irqs, icu_info.nr_msis);
+
+  trace.printf("Registering IRQ server object with registry....\n");
+  auto cap = L4Re::chkcap(_registry->register_irq_obj(this),
+                          "Registering IRQ server object.");
+
+  int irq = -1;
+  unsigned char polarity = 0;
+
+  if (msis_enabled())
+    {
+      irq = _icu->alloc_msi();
+
+      if (irq >= 0)
+        {
+          trace.printf("Allocated MSI vector: %d\n", irq);
+
+          irq |= L4::Icu::F_msi;
+
+          // assume MSIs are edge triggered
+          _irq_trigger_type = 1;
+        }
+      else
+        irq = -1;
+    }
+
+
+  if (irq == -1)
+    // use the legacy interrupt
+    irq = L4Re::chksys(_dev.irq_enable(&_irq_trigger_type, &polarity),
+                       "Enabling legacy interrupt.");
+
+  int unmask_via_icu = l4_error(_icu->icu()->bind(irq, cap));
+  L4Re::chksys(unmask_via_icu, "Binding interrupt to ICU.");
+
+  trace.printf("IRQ[%x] unmask: %s\n", irq,
+               unmask_via_icu ? "via ICU" : "direct");
+
+  if (irq & L4::Icu::F_msi)
+    {
+      l4_icu_msi_info_t msi_info;
+      l4_uint64_t source = _dev.dev_handle() | L4vbus::Icu::Src_dev_handle;
+      L4Re::chksys(_icu->icu()->msi_info(irq, source, &msi_info),
+                   "Retrieving MSI info.");
+      Dbg::info().printf("MSI info: vector=0x%x addr=%llx, data=%x\n",
+                         irq, msi_info.msi_addr, msi_info.msi_data);
+
+      enable_msi(irq, msi_info);
+    }
+
+  Dbg::info().printf("Device: interrupt : %x trigger: %d, polarity: %d\n",
                      irq, (int)_irq_trigger_type, (int)polarity);
   trace.printf("Device: interrupt mask: %x\n",
                _regs.r<32>(Regs::Ctl::Intms).read());
 
   _regs.r<32>(Regs::Ctl::Intms).write(~0U);
 
-  trace.printf("Registering server with registry....\n");
-  auto cap = L4Re::chkcap(registry->register_irq_obj(this),
-                          "Registering IRQ server object.");
+  if (unmask_via_icu)
+    L4Re::chksys(l4_ipc_error(_icu->icu()->unmask(irq), l4_utcb()),
+                 "Unmasking interrupt");
+  else
+    L4Re::chksys(l4_ipc_error(cap->unmask(), l4_utcb()),
+                 "Unmasking interrupt");
 
-  trace.printf("Binding interrupt %d...\n", irq);
-  L4Re::chksys(l4_error(icu->bind(irq, cap)), "Binding interrupt to ICU.");
-
-  trace.printf("Unmasking interrupt...\n");
-  L4Re::chksys(l4_ipc_error(cap->unmask(), l4_utcb()),
-               "Unmasking interrupt");
-
-  trace.printf("Enabling Ctl interrupts...\n");
   _regs.r<32>(Regs::Ctl::Intmc).write(~0U);
 
-  trace.printf("Attached to interupt %d\n", irq);
+  trace.printf("Attached to interupt %x\n", irq);
 }
 
 cxx::unique_ptr<Queue::Completion_queue>
-Ctl::create_iocq(l4_uint16_t id, l4_size_t size, Callback cb)
+Ctl::create_iocq(l4_uint16_t id, l4_size_t size, unsigned iv, Callback cb)
 {
   auto cq = cxx::make_unique<Queue::Completion_queue>(size, id, _cap.dstrd(),
                                                       _regs, _dma);
+
   auto *sqe = _asq->produce();
   sqe->opc() = Acs::Create_iocq;
   sqe->nsid = 0;
@@ -173,12 +250,65 @@ Ctl::create_iocq(l4_uint16_t id, l4_size_t size, Callback cb)
   sqe->prp.prp2 = 0;
   sqe->qid() = id;
   sqe->qsize() = cq->size() - 1;
+  sqe->iv() = _pci_dev->get_local_vector(iv);
   sqe->ien() = 1;
   sqe->pc() = 1;
   _asq->_callbacks[sqe->cid()] = cb;
   _asq->submit();
 
   return cq;
+}
+
+unsigned Ctl::allocate_msi(Nvme::Namespace *ns)
+{
+  // Default case for when MSI/X are not supported or none can be allocated.
+  // In this case the namespace will use vector 0 and the same handler as
+  // the controller uses for handling the admin queues.
+  unsigned iv = 0;
+
+  if (msis_enabled())
+    {
+      long msi = _icu->alloc_msi();
+      if (msi >= 0)
+        {
+          iv = msi;
+          msi |= L4::Icu::F_msi;
+
+          auto cap = L4Re::chkcap(_registry->register_irq_obj(ns),
+                                  "Registering IRQ server object.");
+
+          L4Re::chksys(l4_error(_icu->icu()->bind(msi, cap)),
+                       "Binding interrupt to ICU.");
+
+          l4_icu_msi_info_t msi_info;
+          l4_uint64_t source = _dev.dev_handle() | L4vbus::Icu::Src_dev_handle;
+          L4Re::chksys(_icu->icu()->msi_info(msi, source, &msi_info),
+                       "Retrieving MSI info.");
+          Dbg::info().printf("MSI info: vector=0x%lx addr=%llx, data=%x\n", msi,
+                             msi_info.msi_addr, msi_info.msi_data);
+
+          enable_msi(msi, msi_info);
+
+          L4Re::chksys(l4_ipc_error(cap->unmask(), l4_utcb()),
+                       "Unmasking interrupt");
+        }
+      else
+        iv = 0;
+    }
+
+  return iv;
+}
+
+void Ctl::free_msi(unsigned iv, Nvme::Namespace *ns)
+{
+  if (iv == 0)
+    return;
+
+  // We need to delete the IRQ object created in register_irq_obj() ourselves
+  L4::Cap<L4::Task>(L4Re::This_task)
+    ->unmap(ns->obj_cap().fpage(), L4_FP_ALL_SPACES | L4_FP_DELETE_OBJ);
+  _registry->unregister_obj(ns);
+  _icu->free_msi(iv);
 }
 
 cxx::unique_ptr<Queue::Submission_queue>

@@ -24,13 +24,14 @@
 
 #include "nvme_device.h"
 #include "ctl.h"
+#include "icu.h"
 
 #include "debug.h" // needs to come before liblock-dev includes
 #include <l4/libblock-device/block_device_mgr.h>
 #include <l4/libblock-device/virtio_client.h>
 
 static char const *usage_str =
-"Usage: %s [-vq] [--client CAP --device UUID [--ds-max NUM] [--readonly]] [--nosgl]\n\n"
+"Usage: %s [-vq] [--client CAP --device UUID [--ds-max NUM] [--readonly]] [--nosgl] [--nomsi] [--nomsix]\n\n"
 "Options:\n"
 " -v                 Verbose mode.\n"
 " -q                 Quiet mode (do not print any warnings).\n"
@@ -39,6 +40,8 @@ static char const *usage_str =
 " --ds-max NUM       Specify maximum number of dataspaces the client can register\n"
 " --readonly         Only allow readonly access to the device\n"
 " --nosgl            Disable support for SGLs\n"
+" --nomsi            Disable support for MSI interrupts\n"
+" --nomsix           Disable support for MSI-X interrupts\n"
 " --register-ds CAP  Register a trusted dataspace capability\n";
 
 using Base_device_mgr = Block_device::Device_mgr<
@@ -215,6 +218,8 @@ parse_args(int argc, char *const *argv)
     OPT_DS_MAX,
     OPT_READONLY,
     OPT_NOSGL,
+    OPT_NOMSI,
+    OPT_NOMSIX
   };
 
   struct option const loptions[] =
@@ -226,6 +231,8 @@ parse_args(int argc, char *const *argv)
     { "ds-max",        required_argument, NULL,  OPT_DS_MAX },
     { "readonly",      no_argument,       NULL,  OPT_READONLY },
     { "nosgl",         no_argument,       NULL,  OPT_NOSGL },
+    { "nomsi",         no_argument,       NULL,  OPT_NOMSI },
+    { "nomsix",        no_argument,       NULL,  OPT_NOMSIX },
     { "register-ds",   required_argument, NULL, 'd'},
   };
 
@@ -263,6 +270,12 @@ parse_args(int argc, char *const *argv)
         case OPT_NOSGL:
           Nvme::Ctl::use_sgls = false;
           break;
+        case OPT_NOMSI:
+          Nvme::Ctl::use_msis = false;
+          break;
+        case OPT_NOMSIX:
+          Nvme::Ctl::use_msixs = false;
+          break;
         case 'd':
           {
             L4::Cap<L4Re::Dataspace> ds =
@@ -298,7 +311,7 @@ device_scan_finished()
 }
 
 static void
-device_discovery(L4::Cap<L4vbus::Vbus> bus, L4::Cap<L4::Icu> icu,
+device_discovery(L4::Cap<L4vbus::Vbus> bus, cxx::Ref_ptr<Nvme::Icu> icu,
                  L4Re::Util::Shared_cap<L4Re::Dma_space> const &dma)
 {
   Dbg::info().printf("Starting device discovery.\n");
@@ -318,8 +331,9 @@ device_discovery(L4::Cap<L4vbus::Vbus> bus, L4::Cap<L4::Icu> icu,
         {
           try
             {
-              auto ctl = cxx::make_unique<Nvme::Ctl>(child, dma);
-              ctl->register_interrupt_handler(icu, server.registry());
+              auto ctl =
+                cxx::make_unique<Nvme::Ctl>(child, icu, server.registry(), dma);
+              ctl->register_interrupt_handler();
               _ctls.push_back(cxx::move(ctl));
             }
           catch (L4::Runtime_error const &e)
@@ -357,9 +371,11 @@ setup_hardware()
   L4vbus::Icu icudev;
   L4Re::chksys(vbus->root().device_by_hid(&icudev, "L40009"),
                "Look for ICU device.");
-  auto icu = L4Re::chkcap(L4Re::Util::cap_alloc.alloc<L4::Icu>(),
-                          "Allocate ICU capability.");
-  L4Re::chksys(icudev.vicu(icu), "Request ICU capability.");
+  auto icu_cap = L4Re::chkcap(L4Re::Util::cap_alloc.alloc<L4::Icu>(),
+                              "Allocate ICU capability.");
+  L4Re::chksys(icudev.vicu(icu_cap), "Request ICU capability.");
+
+  auto icu = cxx::make_ref_obj<Nvme::Icu>(icu_cap);
 
   Dbg::trace().printf("Creating DMA domain for VBUS.\n");
 

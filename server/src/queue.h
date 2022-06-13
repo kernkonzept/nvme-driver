@@ -72,6 +72,7 @@ struct Sqe
   CXX_BITFIELD_MEMBER(0, 0, pc, cdw11);  ///< Physically Contiguous
 
   // Create I/O Completion Queue command
+  CXX_BITFIELD_MEMBER(16, 31, iv, cdw11); ///< Interrupt Vector
   CXX_BITFIELD_MEMBER(1, 1, ien, cdw11); ///< Interrupt Enable
 
   // Create I/O Completion Submission command

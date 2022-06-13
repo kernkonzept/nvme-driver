@@ -18,11 +18,13 @@ namespace Nvme {
 
 class Ctl;
 
-class Namespace
+class Namespace : public L4::Irqep_t<Namespace>
 {
 public:
   Namespace(Ctl &ctl, l4_uint32_t nsid, l4_size_t lba_sz,
             cxx::Ref_ptr<Inout_buffer> const &in);
+
+  ~Namespace();
 
   void
   async_loop_init(l4_uint32_t nsids,
@@ -87,6 +89,8 @@ private:
   std::function<void(cxx::unique_ptr<Namespace>)> _callback;
 
   Ctl &_ctl;
+
+  unsigned _msi;
 
   cxx::unique_ptr<Queue::Completion_queue> _iocq;
   cxx::unique_ptr<Queue::Submission_queue> _iosq;

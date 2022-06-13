@@ -89,6 +89,14 @@ command line options:
 
   This option disables support for SGLs.
 
+* `--nomsi`
+
+  This option disables support for MSI interrupts.
+
+* `--nomsix`
+
+  This option disables support for MSI-X interrupts.
+
 * `-d <cap_name>`, `--register-ds <cap_name>`
   This option registers a trusted dataspace capability. If this option gets
   used, it is not possible to communicate to the driver via dataspaces other

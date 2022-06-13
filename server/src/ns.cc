@@ -18,11 +18,21 @@ namespace Nvme {
 
 Namespace::Namespace(Ctl &ctl, l4_uint32_t nsid, l4_size_t lba_sz,
                      cxx::Ref_ptr<Inout_buffer> const &in)
-: _callback(nullptr), _ctl(ctl), _nsid(nsid), _lba_sz(lba_sz), _dlfeat(0)
+: _callback(nullptr),
+  _ctl(ctl),
+  _msi(0),
+  _nsid(nsid),
+  _lba_sz(lba_sz),
+  _dlfeat(0)
 {
   _nsze = *in->get<l4_uint64_t>(Cns_in::Nsze);
   _ro = *in->get<l4_uint8_t>(Cns_in::Nsattr) & Nsattr::Wp;
   _dlfeat.raw = *in->get<l4_uint8_t>(Cns_in::Dlfeat);
+}
+
+Namespace::~Namespace()
+{
+  _ctl.free_msi(_msi, this);
 }
 
 void
@@ -30,8 +40,11 @@ Namespace::async_loop_init(
   l4_uint32_t nsids, std::function<void(cxx::unique_ptr<Namespace>)> callback)
 {
   _callback = callback;
+
+  _msi = _ctl.allocate_msi(this);
+
   _iocq =
-    _ctl.create_iocq(qid(), Queue::Ioq_size, [=](l4_uint16_t status) {
+    _ctl.create_iocq(qid(), Queue::Ioq_size, _msi, [=](l4_uint16_t status) {
       if (status)
         {
           trace.printf(

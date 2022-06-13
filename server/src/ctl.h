@@ -29,6 +29,9 @@
 #include "inout_buffer.h"
 #include "iomem.h"
 
+#include "pci.h"
+#include "icu.h"
+
 #include <l4/libblock-device/device.h>
 
 namespace Nvme {
@@ -44,7 +47,8 @@ public:
   /**
    * Create a new NVMe controller from a vbus PCI device.
    */
-  Ctl(L4vbus::Pci_dev const &dev,
+  Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
+      L4Re::Util::Object_registry *registry,
       L4Re::Util::Shared_cap<L4Re::Dma_space> const &dma);
 
   Ctl(Ctl const &) = delete;
@@ -58,13 +62,9 @@ public:
   /**
    * Register the interrupt handler with a registry.
    *
-   * \param icu      ICU to request the capability for the hardware interrupt.
-   * \param registry Registry that dispatches the interrupt IPCs.
-   *
    * \throws L4::Runtime_error Resources are not available or accessible.
    */
-  void register_interrupt_handler(L4::Cap<L4::Icu> icu,
-                                  L4Re::Util::Object_registry *registry);
+  void register_interrupt_handler();
 
 
   /**
@@ -93,11 +93,34 @@ public:
   bool supports_sgl() const
   { return use_sgls && _sgls; }
 
+  bool msis_enabled() const
+  {
+    return _icu->msis_supported()
+           && ((use_msixs && _pci_dev->msixs_supported())
+               || (use_msis && _pci_dev->msis_supported()));
+  }
+
+  bool enable_msi(int irq, l4_icu_msi_info_t msi_info)
+  {
+    if (!(irq & L4::Icu::F_msi))
+      return false;
+
+    if (use_msixs && _pci_dev->msixs_supported())
+      _pci_dev->enable_msix(irq, msi_info);
+    else if (use_msis && _pci_dev->msis_supported())
+      _pci_dev->enable_msi(irq, msi_info);
+
+    return true;
+  }
+
+  unsigned allocate_msi(Nvme::Namespace *ns);
+  void free_msi(unsigned iv, Nvme::Namespace *ns);
+
   std::string sn() const
   { return _sn; }
 
   cxx::unique_ptr<Queue::Completion_queue>
-  create_iocq(l4_uint16_t id, l4_size_t size, Callback cb);
+  create_iocq(l4_uint16_t id, l4_size_t size, unsigned iv, Callback cb);
   cxx::unique_ptr<Queue::Submission_queue>
   create_iosq(l4_uint16_t id, l4_size_t size, l4_size_t sgls, Callback cb);
   void
@@ -107,23 +130,17 @@ public:
 private:
   l4_uint32_t cfg_read(l4_uint32_t reg) const
   {
-    l4_uint32_t val;
-    L4Re::chksys(_dev.cfg_read(reg, &val, 32));
-
-    return val;
+    return _pci_dev->cfg_read_32(reg);
   }
 
   l4_uint16_t cfg_read_16(l4_uint32_t reg) const
   {
-    l4_uint32_t val;
-    L4Re::chksys(_dev.cfg_read(reg, &val, 16));
-
-    return val;
+    return _pci_dev->cfg_read_16(reg);
   }
 
   void cfg_write_16(l4_uint32_t reg, l4_uint16_t val)
   {
-    L4Re::chksys(_dev.cfg_write(reg, val, 16));
+    _pci_dev->cfg_write_16(reg, val);
   }
 
   l4_uint64_t cfg_read_bar() const
@@ -133,6 +150,9 @@ private:
   }
 
   L4vbus::Pci_dev _dev;
+  cxx::unique_ptr<Pci_dev> _pci_dev;
+  cxx::Ref_ptr<Icu> _icu;
+  L4Re::Util::Object_registry *_registry;
   L4Re::Util::Shared_cap<L4Re::Dma_space> _dma;
   Iomem _iomem;
   L4drivers::Register_block<32> _regs;
@@ -153,5 +173,7 @@ private:
 
 public:
   static bool use_sgls;
+  static bool use_msis;
+  static bool use_msixs;
 };
 }
