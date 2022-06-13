@@ -30,7 +30,7 @@
 #include <l4/libblock-device/virtio_client.h>
 
 static char const *usage_str =
-"Usage: %s [-vq] [--client CAP --device UUID [--ds-max NUM] [--readonly]] [--sgl]\n\n"
+"Usage: %s [-vq] [--client CAP --device UUID [--ds-max NUM] [--readonly]] [--nosgl]\n\n"
 "Options:\n"
 " -v                 Verbose mode.\n"
 " -q                 Quiet mode (do not print any warnings).\n"
@@ -38,7 +38,7 @@ static char const *usage_str =
 " --device UUID      Specify the UUID of the device or partition\n"
 " --ds-max NUM       Specify maximum number of dataspaces the client can register\n"
 " --readonly         Only allow readonly access to the device\n"
-" --sgl              Enable experimental support for SGLs\n"
+" --nosgl            Disable support for SGLs\n"
 " --register-ds CAP  Register a trusted dataspace capability\n";
 
 using Base_device_mgr = Block_device::Device_mgr<
@@ -214,7 +214,7 @@ parse_args(int argc, char *const *argv)
     OPT_DEVICE,
     OPT_DS_MAX,
     OPT_READONLY,
-    OPT_SGL
+    OPT_NOSGL,
   };
 
   struct option const loptions[] =
@@ -225,7 +225,7 @@ parse_args(int argc, char *const *argv)
     { "device",        required_argument, NULL,  OPT_DEVICE },
     { "ds-max",        required_argument, NULL,  OPT_DS_MAX },
     { "readonly",      no_argument,       NULL,  OPT_READONLY },
-    { "sgl",           no_argument,       NULL,  OPT_SGL },
+    { "nosgl",         no_argument,       NULL,  OPT_NOSGL },
     { "register-ds",   required_argument, NULL, 'd'},
   };
 
@@ -260,8 +260,8 @@ parse_args(int argc, char *const *argv)
         case OPT_READONLY:
           opts.readonly = true;
           break;
-        case OPT_SGL:
-          Nvme::Ctl::use_sgls = true;
+        case OPT_NOSGL:
+          Nvme::Ctl::use_sgls = false;
           break;
         case 'd':
           {

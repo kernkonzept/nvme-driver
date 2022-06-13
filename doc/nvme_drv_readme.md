@@ -85,9 +85,9 @@ command line options:
   This option sets the access to disks or partitions to read only for the
   preceding `client` option.
 
-* `--sgl`
+* `--nosgl`
 
-  This option enables the experimental support for SGLs.
+  This option disables support for SGLs.
 
 * `-d <cap_name>`, `--register-ds <cap_name>`
   This option registers a trusted dataspace capability. If this option gets

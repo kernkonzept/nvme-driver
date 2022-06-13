@@ -29,7 +29,7 @@ static Dbg trace(Dbg::Trace, "ctl");
 
 namespace Nvme {
 
-bool Ctl::use_sgls = false;
+bool Ctl::use_sgls = true;
 
 Ctl::Ctl(L4vbus::Pci_dev const &dev,
          L4Re::Util::Shared_cap<L4Re::Dma_space> const &dma)
