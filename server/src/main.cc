@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2020 Kernkonzept GmbH.
+ * Copyright (C) 2020, 2022 Kernkonzept GmbH.
  * Author(s): Sarah Hoffmann <sarah.hoffmann@kernkonzept.com>
  *            Jakub Jermar <jakub.jermar@kernkonzept.com>
+ *            Manuel von Oltersdorff-Kalettka <manuel.kalettka@kernkonzept.com>
  *
  * This file is distributed under the terms of the GNU General Public
  * License, version 2.  Please see the COPYING-GPL-2 file for details.
@@ -31,17 +32,21 @@
 static char const *usage_str =
 "Usage: %s [-vq] [--client CAP --device UUID [--ds-max NUM] [--readonly]] [--sgl]\n\n"
 "Options:\n"
-" -v   Verbose mode.\n"
-" -q   Quiet mode (do not print any warnings).\n"
-" --client CAP    Add a static client via the CAP capability\n"
-" --device UUID   Specify the UUID of the device or partition\n"
-" --ds-max NUM    Specify maximum number of dataspaces the client can register\n"
-" --readonly      Only allow readonly access to the device\n"
-" --sgl           Enable experimental support for SGLs\n";
+" -v                 Verbose mode.\n"
+" -q                 Quiet mode (do not print any warnings).\n"
+" --client CAP       Add a static client via the CAP capability\n"
+" --device UUID      Specify the UUID of the device or partition\n"
+" --ds-max NUM       Specify maximum number of dataspaces the client can register\n"
+" --readonly         Only allow readonly access to the device\n"
+" --sgl              Enable experimental support for SGLs\n"
+" --register-ds CAP  Register a trusted dataspace capability\n";
 
 using Base_device_mgr = Block_device::Device_mgr<
   Nvme::Nvme_base_device,
   Block_device::Partitionable_factory<Nvme::Nvme_base_device>>;
+
+using Ds_vector = std::vector<L4::Cap<L4Re::Dataspace>>;
+static std::shared_ptr<Ds_vector> trusted_dataspaces;
 
 class Blk_mgr
 : public Base_device_mgr,
@@ -95,7 +100,9 @@ public:
 
     L4::Cap<void> cap;
     int ret = create_dynamic_client(device, -1, num_ds, &cap, readonly,
-                [](Nvme::Nvme_base_device *) {});
+                                    [](Nvme::Nvme_base_device *) {},
+                                    !trusted_dataspaces->empty(),
+                                    trusted_dataspaces);
     if (ret >= 0)
       res = L4::Ipc::make_cap(cap, L4_CAP_FPAGE_RWSD);
 
@@ -177,7 +184,9 @@ struct Client_opts
           }
 
         blk_mgr->add_static_client(cap, device, -1, ds_max, readonly,
-                                   [](Nvme::Nvme_base_device *) {});
+                                   [](Nvme::Nvme_base_device *) {},
+                                   !trusted_dataspaces->empty(),
+                                   trusted_dataspaces);
       }
 
     return true;
@@ -217,12 +226,13 @@ parse_args(int argc, char *const *argv)
     { "ds-max",        required_argument, NULL,  OPT_DS_MAX },
     { "readonly",      no_argument,       NULL,  OPT_READONLY },
     { "sgl",           no_argument,       NULL,  OPT_SGL },
+    { "register-ds",   required_argument, NULL, 'd'},
   };
 
   Client_opts opts;
   for (;;)
     {
-      int opt = getopt_long(argc, argv, "vq", loptions, NULL);
+      int opt = getopt_long(argc, argv, "vqd:", loptions, NULL);
       if (opt == -1)
         break;
 
@@ -253,6 +263,14 @@ parse_args(int argc, char *const *argv)
         case OPT_SGL:
           Nvme::Ctl::use_sgls = true;
           break;
+        case 'd':
+          {
+            L4::Cap<L4Re::Dataspace> ds =
+              L4Re::chkcap(L4Re::Env::env()->get_cap<L4Re::Dataspace>(optarg),
+                           "Find a dataspace capability.\n");
+            trusted_dataspaces->push_back(ds);
+            break;
+          }
         default:
           Dbg::warn().printf(usage_str, argv[0]);
           return -1;
@@ -383,6 +401,7 @@ run(int argc, char *const *argv)
 int
 main(int argc, char *const *argv)
 {
+  trusted_dataspaces = std::make_shared<Ds_vector>();
   try
     {
       return run(argc, argv);
