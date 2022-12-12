@@ -436,7 +436,8 @@ Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> callback)
       }
 
     _sn = std::string(ic->get<char>(Cns_ic::Sn), 20);
-    _sn.erase(_sn.find(' '));
+    if (auto pos = _sn.find(' ') != _sn.npos)
+      _sn.erase(pos);
 
     printf("Serial Number: %s\n", _sn.c_str());
     printf("Model Number: %.40s\n", ic->get<char>(Cns_ic::Mn));
