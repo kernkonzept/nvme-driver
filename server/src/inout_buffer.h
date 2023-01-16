@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Kernkonzept GmbH.
+ * Copyright (C) 2020-2021 Kernkonzept GmbH.
  * Author(s): Sarah Hoffmann <sarah.hoffmann@kernkonzept.com>
  *            Jakub Jermar <jakub.jermar@kernkonzept.com>
  *
