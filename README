@@ -1,7 +1,0 @@
-NVMe server
-===========
-
-The server has two parts. On one side there is the NVMe hardware driver that
-communicates with the NVMe controller and provides the interrupt handling.  On
-the other side a VIRTIO interface has been implemented for client-side
-communication.
