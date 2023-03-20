@@ -50,7 +50,17 @@ public:
   l4_size_t max_size() const override
   {
     if (_ns->ctl().supports_sgl())
-      return 4 * 1024 * 1024;
+      {
+        l4_size_t max_size = 4 * 1024 * 1024;
+        if (_ns->ctl().mdts())
+          {
+            l4_size_t ps = 1UL << (12 + _ns->ctl().cap().mpsmin());
+            // Spread the MDTS limit evenly over all allowed VIRTIO blk segments
+            max_size =
+              cxx::min(max_size, (ps << _ns->ctl().mdts()) / Queue::Ioq_sgls);
+          }
+        return max_size;
+      }
     else
       // need two pages / PRP entries for one unaligned page worth of data
       return L4_PAGESIZE;

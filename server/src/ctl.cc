@@ -444,6 +444,8 @@ Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> callback)
     printf("Model Number: %.40s\n", ic->get<char>(Cns_ic::Mn));
     printf("Firmware Revision: %.8s\n", ic->get<char>(Cns_ic::Fr));
 
+    _mdts = *ic->get<l4_uint8_t>(Cns_ic::Mdts);
+    printf("Maximum Transfer Data Size: %u\n", _mdts);
     printf("Controller ID: %x\n", *ic->get<l4_uint16_t>(Cns_ic::Cntlid));
 
     _sgls = (*ic->get<l4_uint32_t>(Cns_ic::Sgls) & 0x3) != 0;

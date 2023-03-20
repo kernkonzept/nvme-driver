@@ -116,8 +116,14 @@ public:
   unsigned allocate_msi(Nvme::Namespace *ns);
   void free_msi(unsigned iv, Nvme::Namespace *ns);
 
+  Ctl_cap const &cap() const
+  { return _cap; }
+
   std::string sn() const
   { return _sn; }
+
+  l4_uint8_t mdts() const
+  { return _mdts; }
 
   cxx::unique_ptr<Queue::Completion_queue>
   create_iocq(l4_uint16_t id, l4_size_t size, unsigned iv, Callback cb);
@@ -165,6 +171,8 @@ private:
 
   /// Serial number
   std::string _sn;
+
+  l4_uint8_t _mdts;
 
   // Admin Completion Queue
   cxx::unique_ptr<Queue::Completion_queue> _acq;

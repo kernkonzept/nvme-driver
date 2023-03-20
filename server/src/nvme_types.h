@@ -65,6 +65,7 @@ enum Cns_ic
   Sn = 4u,   ///< Serial Number
   Mn = 24u,  ///< Model Number
   Fr = 64u,  ///< Firmware Revision
+  Mdts = 77u, ///< Maximum Data Transfer Size
   Cntlid = 78u, ///< Controller ID
   Nn = 516u, ///< Number of Namespaces
   Sgls = 536u, ///< SGL Support
