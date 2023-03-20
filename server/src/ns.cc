@@ -120,13 +120,15 @@ Namespace::readwrite_prepare_sgl(bool read, l4_uint64_t slba,
   sqe->nsid = _nsid;
   sqe->psdt() = Psdt::Use_sgls;
   sqe->sgl1.sgl_id = Sgl_id::Last_segment_addr;
-  sqe->sgl1.addr = _iosq->_sgls->pget(sqe->cid() * Queue::Ioq_sgls);
+  sqe->sgl1.addr =
+    _iosq->_sgls->pget(sqe->cid() * Queue::Ioq_sgls * sizeof(Sgl_desc));
   sqe->cdw10 = slba & 0xfffffffful;
   sqe->cdw11 = slba >> 32;
   sqe->cdw13 = 0;
   sqe->cdw14 = 0;
   sqe->cdw15 = 0;
-  *sglp = _iosq->_sgls->get<Sgl_desc>(sqe->cid() * Queue::Ioq_sgls);
+  *sglp = _iosq->_sgls->get<Sgl_desc>(sqe->cid() * Queue::Ioq_sgls
+                                      * sizeof(Sgl_desc));
   return sqe;
 }
 
