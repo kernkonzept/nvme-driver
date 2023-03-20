@@ -158,7 +158,7 @@ public:
     for (auto i = 0u; i < size; i++)
       {
         Sqe *sqe = _buf->get<Sqe>(i * _entry_size);
-        sqe->cdw0 = i << 16;
+        sqe->cid() = i;
       }
 
     _callbacks.reserve(_size);
