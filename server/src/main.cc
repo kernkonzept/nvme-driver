@@ -56,10 +56,28 @@ class Blk_mgr
 : public Base_device_mgr,
   public L4::Epiface_t<Blk_mgr, L4::Factory>
 {
+  class Deletion_irq : public L4::Irqep_t<Deletion_irq>
+  {
+  public:
+    void handle_irq()
+    { _parent->check_clients(); }
+
+    Deletion_irq(Blk_mgr *parent) : _parent{parent} {}
+
+  private:
+    Blk_mgr *_parent;
+  };
+
 public:
   Blk_mgr(L4Re::Util::Object_registry *registry)
-  : Base_device_mgr(registry)
-  {}
+  : Base_device_mgr(registry),
+    _del_irq(this)
+  {
+    auto c = L4Re::chkcap(registry->register_irq_obj(&_del_irq),
+                          "Creating IRQ for IPC gate deletion notifications.");
+    L4Re::chksys(L4Re::Env::env()->main_thread()->register_del_irq(c),
+                 "Registering deletion IRQ at the thread.");
+  }
 
   long op_create(L4::Factory::Rights, L4::Ipc::Cap<void> &res, l4_umword_t,
                  L4::Ipc::Varg_list_ref valist)
@@ -108,7 +126,10 @@ public:
                                     !trusted_dataspaces->empty(),
                                     trusted_dataspaces);
     if (ret >= 0)
-      res = L4::Ipc::make_cap(cap, L4_CAP_FPAGE_RWSD);
+      {
+        res = L4::Ipc::make_cap(cap, L4_CAP_FPAGE_RWSD);
+        L4::cap_cast<L4::Kobject>(cap)->dec_refcnt(1);
+      }
 
     return (ret == -L4_ENODEV && _scan_in_progress) ? -L4_EAGAIN : ret;
   }
@@ -164,6 +185,7 @@ private:
     return true;
   }
 
+  Deletion_irq _del_irq;
   bool _scan_in_progress = true;
 };
 
