@@ -2,6 +2,7 @@ PKGDIR ?= ../..
 L4DIR  ?= $(PKGDIR)/../..
 
 MODE := l4linux
+TEST_MODE := l4linux
 SYSTEMS := x86-l4f amd64-l4f
 
 TEST_GROUP    := nvme-driver/linux-virtio
