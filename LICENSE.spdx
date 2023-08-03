@@ -1,0 +1,24 @@
+## This file states the license of this package and possibly its subpackages
+## in machine and human readable format. The PackageName refers to the package
+## whose license is defined by PackageLicenseConcluded.
+## For more information about this file format visit the SPDX website at
+## https://spdx.org
+
+## Document Information
+SPDXVersion: SPDX-2.3
+DataLicense: CC0-1.0
+DocumentNamespace: spdx:kernkonzept/nvme-driver-8f9192f6-076c-4a6a-9e6a-263996d71f21
+DocumentName: nvme-driver
+SPDXID: SPDXRef-DOCUMENT
+Created: 2023-01-30T00:00:00Z
+Creator: Organization: Kernkonzept GmbH (info@kernkonzept.com)
+
+## Package Information
+PackageName: nvme-driver
+SPDXID: SPDXRef-nvme-driver
+PackageOriginator: Organization: Kernkonzept GmbH (info@kernkonzept.com)
+PackageLicenseDeclared: GPL-2.0-only
+PackageLicenseConcluded: GPL-2.0-only
+FilesAnalyzed: false
+PackageCopyrightText: NOASSERTION
+PackageDownloadLocation: NOASSERTION
