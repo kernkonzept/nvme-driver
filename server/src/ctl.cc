@@ -79,8 +79,18 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
   Ctl_cc cc(0);
   if (Ctl_csts(_regs.r<32>(Regs::Ctl::Csts).read()).rdy())
     {
-      _regs.r<32>(Regs::Ctl::Cc).write(cc.raw);
       cc.raw = _regs.r<32>(Regs::Ctl::Cc).read();
+      cc.en() = 0;
+      _regs.r<32>(Regs::Ctl::Cc).write(cc.raw);
+      (void) _regs.r<32>(Regs::Ctl::Cc).read(); // flush
+
+      cc.raw = 0;
+
+      trace.printf("Waiting for the controller to become disabled...\n");
+      while (Ctl_csts(_regs.r<32>(Regs::Ctl::Csts).read()).rdy())
+        ;
+      trace.printf("done.\n");
+
       // A short delay seems to be necessary for some controllers:
       // - 0x15b7 0x5011 Sandisk Corp WD PC SN810 / Black SN850 NVMe SSD
       l4_sleep(1);
