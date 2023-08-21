@@ -57,6 +57,8 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
                cfg_read_bar(), _iomem.vaddr.get(), _cap.raw,
                _regs.r<32>(Regs::Ctl::Vs).read());
 
+  enable_quirks();
+
   if (_cap.css() & 1)
     trace.printf("Controller supports NVM command set\n");
   else
@@ -91,9 +93,9 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
         ;
       trace.printf("done.\n");
 
-      // A short delay seems to be necessary for some controllers:
-      // - 0x15b7 0x5011 Sandisk Corp WD PC SN810 / Black SN850 NVMe SSD
-      l4_sleep(1);
+      // A short delay seems to be necessary for some controllers
+      if (_quirks.delay_after_disable())
+        l4_sleep(3);
     }
   else
     trace.printf("The controller was not enabled, not disabling.\n");
@@ -137,6 +139,10 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
   while (!Ctl_csts(_regs.r<32>(Regs::Ctl::Csts).read()).rdy())
     ;
   trace.printf("done.\n");
+
+  // Some controllers need a delay after the controller becomes ready
+  if (_quirks.delay_after_enable())
+    l4_sleep(_quirks.delay_after_enable_ms);
 
   l4_uint16_t cmd = cfg_read_16(0x04);
   if (!(cmd & 4))
@@ -499,6 +505,36 @@ Ctl::is_nvme_ctl(L4vbus::Device const &dev, l4vbus_device_t const &dev_info)
   // subclass = 08 (non-volatile memory controller)
   // prgif    = 02 (NVMe)
   return (class_code == 0x10802);
+}
+
+void
+Ctl::enable_quirks()
+{
+  l4_uint32_t val = 0;
+  L4Re::chksys(_dev.cfg_read(0, &val, 32));
+
+  l4_uint16_t vendor_id = val & 0xffffU;
+  l4_uint16_t device_id = val >> 16;
+
+  // 15b7:5011 Sandisk Corp WD PC SN810 / Black SN850 NVMe SSD
+  if ((vendor_id == 0x15b7) && (device_id == 0x5011))
+    _quirks.delay_after_disable() = true;
+
+  // 144d:a80a Samsung Electronics Co Ltd NVMe SSD Controller PM9A1/PM9A3/980PRO
+  if ((vendor_id == 0x144d) && (device_id == 0xa80a))
+    {
+      _quirks.delay_after_enable() = true;
+      _quirks.delay_after_enable_ms = 60;
+    }
+
+  // 1e0f:000d KIOXIA Corporation NVMe SSD Controller XG7
+  if ((vendor_id == 0x1e0f) && (device_id == 0x000d))
+    {
+      _quirks.delay_after_enable() = true;
+      _quirks.delay_after_enable_ms = 3;
+    }
+
+  trace.printf("Enabled quirks: %#x\n", (unsigned int) _quirks.raw);
 }
 
 }

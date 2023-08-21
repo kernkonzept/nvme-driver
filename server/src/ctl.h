@@ -155,6 +155,8 @@ private:
            & 0xFFFFFFFFFFFFF000UL;
   }
 
+  void enable_quirks();
+
   L4vbus::Pci_dev _dev;
   cxx::unique_ptr<Pci_dev> _pci_dev;
   cxx::Ref_ptr<Icu> _icu;
@@ -178,6 +180,19 @@ private:
   cxx::unique_ptr<Queue::Completion_queue> _acq;
   // Admin Submission Queue
   cxx::unique_ptr<Queue::Submission_queue> _asq;
+
+  struct Quirks
+  {
+    l4_uint8_t raw;
+    CXX_BITFIELD_MEMBER(1, 2, delay_after_enable,
+                        raw); ///< Controller needs a delay after it's enbaled
+    CXX_BITFIELD_MEMBER(0, 1, delay_after_disable,
+                        raw); ///< Controller needs a delay after it's disabled
+
+    unsigned delay_after_enable_ms;
+
+    Quirks() : raw(0), delay_after_enable_ms(0) {}
+  } _quirks;
 
 public:
   static bool use_sgls;
