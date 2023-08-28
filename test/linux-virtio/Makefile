@@ -13,7 +13,7 @@ TEST_TARGET_virtio_read  := virtio_read.sh
 
 # The test image with GPT, will be created in the test setup script
 IMAGE_FILE     = $(OBJ_DIR)/test_nvme.img
-TEST_SETUP     = $(SRC_DIR)/../examples/create-test-disk.sh $(IMAGE_FILE)
+TEST_SETUP     = $(SRC_DIR)/create-test-disk.sh $(IMAGE_FILE)
 
 REQUIRED_MODULES := l4linux-nvme.io io nvme-drv
 NED_CFG       := l4linux-nvme.cfg
