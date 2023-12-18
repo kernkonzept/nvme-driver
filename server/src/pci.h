@@ -251,11 +251,18 @@ public:
           cfg_read_32(_msix_cap.addr + Pci_msix::Table_offset,
                       "Reading MSI-X capability Table Offset register");
 
-        // TODO: 64-bit BARs?
-        l4_uint32_t bar = cfg_read_32(0x10 + (unsigned)table_offset.bir() * 4,
+        l4_uint64_t bar = cfg_read_32(0x10 + (unsigned)table_offset.bir() * 4,
                                       "Reading Table Offset BAR");
+
+        if (bar & 4) // 64bit BAR?
+          {
+            l4_uint32_t bar2 = cfg_read_32(0x14 + (unsigned)table_offset.bir() * 4,
+                                           "Reading Table Offset BAR 2");
+            bar |= (l4_uint64_t)bar2 << 32;
+          }
+
         Iomem msix_table_mem(
-          (bar & 0xfffffff0) + table_offset.offset(), _msix_cap.ctrl.ts() * 16,
+          (bar & ~0xfull) + table_offset.offset(), _msix_cap.ctrl.ts() * 16,
           L4::cap_reinterpret_cast<L4Re::Dataspace>(_dev.bus_cap()));
         _msix_table = std::move(msix_table_mem);
       }
