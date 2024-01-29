@@ -534,6 +534,13 @@ Ctl::enable_quirks()
       _quirks.delay_after_enable_ms = 3;
     }
 
+  // Micron Technology 2300 NVMe (Santana)
+  if ((vendor_id == 0x1344) && (device_id == 0x5405))
+    {
+      _quirks.delay_after_enable() = true;
+      _quirks.delay_after_enable_ms = 3;
+    }
+
   trace.printf("Enabled quirks: %#x\n", (unsigned int) _quirks.raw);
 }
 
