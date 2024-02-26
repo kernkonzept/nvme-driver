@@ -23,6 +23,8 @@
 #include <l4/vbus/vbus>
 #include <l4/vbus/vbus_pci>
 
+#include <terminate_handler-l4>
+
 #include "nvme_device.h"
 #include "ctl.h"
 #include "icu.h"
@@ -449,10 +451,12 @@ setup_hardware()
   device_discovery(vbus, icu);
 }
 
-static int
-run(int argc, char *const *argv)
+int
+main(int argc, char *const *argv)
 {
   Dbg::set_level(3);
+
+  trusted_dataspaces = std::make_shared<Ds_vector>();
 
   int arg_idx = parse_args(argc, argv);
   if (arg_idx < 0)
@@ -467,29 +471,4 @@ run(int argc, char *const *argv)
   server.loop();
 
   return 0;
-}
-
-
-int
-main(int argc, char *const *argv)
-{
-  trusted_dataspaces = std::make_shared<Ds_vector>();
-  try
-    {
-      return run(argc, argv);
-    }
-  catch (L4::Runtime_error const &e)
-    {
-      Err().printf("%s: %s\n", e.str(), e.extra_str());
-    }
-  catch (L4::Base_exception const &e)
-    {
-      Err().printf("Error: %s\n", e.str());
-    }
-  catch (std::exception const &e)
-    {
-      Err().printf("Error: %s\n", e.what());
-    }
-
-  return -1;
 }
