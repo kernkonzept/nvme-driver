@@ -24,7 +24,8 @@ class Nvme_base_device
 {
 };
 
-class Nvme_device : public Nvme_base_device
+class Nvme_device
+: public Block_device::Device_with_notification_domain<Nvme_base_device>
 {
 public:
   Nvme_device(Namespace *ns) : _ns(cxx::move(ns))
