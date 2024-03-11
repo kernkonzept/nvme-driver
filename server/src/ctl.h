@@ -195,6 +195,11 @@ private:
   } _quirks;
 
 public:
+  enum
+  {
+    Mps_base = 12,  ///< Base page width supported by NVMe
+  };
+
   static bool use_sgls;
   static bool use_msis;
   static bool use_msixs;

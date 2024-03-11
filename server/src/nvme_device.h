@@ -49,25 +49,34 @@ public:
 
   l4_size_t max_size() const override
   {
+    l4_size_t max_size;
+    l4_size_t ps = 1UL << (Ctl::Mps_base + _ns->ctl().cap().mpsmin());
+
     if (_ns->ctl().supports_sgl())
       {
-        l4_size_t max_size = 4 * 1024 * 1024;
+        max_size = 4 * 1024 * 1024;
         if (_ns->ctl().mdts())
           {
-            l4_size_t ps = 1UL << (12 + _ns->ctl().cap().mpsmin());
             // Spread the MDTS limit evenly over all allowed VIRTIO blk segments
             max_size =
               cxx::min(max_size, (ps << _ns->ctl().mdts()) / Queue::Ioq_sgls);
           }
-        return max_size;
       }
     else
-      // need two pages / PRP entries for one unaligned page worth of data
-      return L4_PAGESIZE;
+      {
+        // Account for the possibility of data starting at non-zero page offset.
+        max_size = (Queue::Prp_data_entries - 1) * L4_PAGESIZE;
+        if (_ns->ctl().mdts())
+          max_size = cxx::min(max_size, ps << _ns->ctl().mdts());
+      }
+    return max_size;
   }
 
   unsigned max_segments() const override
   {
+    // When SGLs are not available, the max number of segments must be one
+    // because it is generally not possible to account for the page-unaligned
+    // start of a segment in the middle of a PRP List.
     return _ns->ctl().supports_sgl() ? Queue::Ioq_sgls : 1;
   }
 

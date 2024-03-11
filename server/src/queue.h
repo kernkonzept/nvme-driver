@@ -26,8 +26,18 @@ namespace Queue {
 // These are tunables
 enum
 {
-  Ioq_size = 32, ///< Number of entries per I/O queue.
-  Ioq_sgls = 32, ///< Number of SGL entries per I/O queue entry.
+  Ioq_size = 32,      ///< Number of entries per I/O queue.
+  Ioq_sgls = 32,      ///< Number of SGL entries per I/O queue entry.
+  Prp_list_pages = 2, ///< Number of PRP List pages per I/O queue entry.
+
+  /// Number of PRP entries available in the command.
+  Prp_command_entries = 2,
+  Prp_list_entries_per_page = L4_PAGESIZE / sizeof(Prp_list_entry),
+  /// Number of PRP entries available in the PRP list.
+  Prp_list_entries = Prp_list_pages * Prp_list_entries_per_page,
+  /// Number of PRP entries that map actual data in both the command and the PRP
+  /// list. Entries that point to a PRP list are not included.
+  Prp_data_entries = Prp_command_entries + Prp_list_entries - Prp_list_pages,
 };
 
 /// Submission Queue Entry
@@ -169,6 +179,12 @@ public:
           l4_round_page(size * sgls * sizeof(Sgl_desc)), dma,
           L4Re::Dma_space::Direction::To_device, L4Re::Rm::F::Cache_uncached);
       }
+    else if (Prp_list_pages > 0)
+      {
+        _prps = cxx::make_ref_obj<Inout_buffer>(
+          size * Prp_list_pages * L4_PAGESIZE, dma,
+          L4Re::Dma_space::Direction::To_device, L4Re::Rm::F::Cache_uncached);
+      }
   }
 
   bool is_full() const { return _head == wrap_around(_tail + 1); }
@@ -197,6 +213,7 @@ public:
 private:
   std::vector<std::function<void(l4_uint16_t)>> _callbacks;
   cxx::Ref_ptr<Inout_buffer> _sgls;
+  cxx::Ref_ptr<Inout_buffer> _prps;
 
   unsigned tdbl() const { return 0x1000 + ((2 * _y) * (4 << _dstrd)); }
 

@@ -66,7 +66,8 @@ public:
   Queue::Sqe *readwrite_prepare_sgl(bool read, l4_uint64_t slba,
                                     Sgl_desc **sglp) const;
   Queue::Sqe *readwrite_prepare_prp(bool read, l4_uint64_t slba,
-                                    l4_uint64_t paddr, l4_size_t sz) const;
+                                    l4_uint64_t paddr, l4_size_t sz,
+                                    Prp_list_entry **prpp) const;
   void readwrite_submit(Queue::Sqe *sqe, l4_uint16_t nlb, l4_size_t blocks,
                         Callback cb) const;
 

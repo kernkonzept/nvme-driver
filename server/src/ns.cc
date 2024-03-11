@@ -85,17 +85,21 @@ Namespace::async_loop_init(
 
 Queue::Sqe *
 Namespace::readwrite_prepare_prp(bool read, l4_uint64_t slba, l4_uint64_t paddr,
-                                 l4_size_t sz) const
+                                 l4_size_t sz, Prp_list_entry **prpp) const
 {
-  l4_uint64_t prp2 = l4_trunc_page(paddr + sz - 1);
-  if (l4_trunc_page(paddr) == prp2)
-    prp2 = 0; // reserved: set to 0
-  else if (l4_trunc_page(paddr) != prp2 - 1)
-    return 0; // unsupported: would need a PRP list
-
   auto *sqe = _iosq->produce();
   if (!sqe)
     return 0;
+
+  auto prp_list_start =
+    sqe->cid() * Queue::Prp_list_entries * sizeof(Prp_list_entry);
+
+  l4_uint64_t prp2 = l4_trunc_page(paddr + sz - 1);
+  if (l4_trunc_page(paddr) == prp2)
+    prp2 = 0; // reserved: set to 0
+  else if (l4_trunc_page(paddr) != prp2 - L4_PAGESIZE)
+    prp2 = _iosq->_prps->pget(prp_list_start);
+
   sqe->opc() = (read ? Iocs::Read : Iocs::Write);
   sqe->nsid = _nsid;
   sqe->psdt() = Psdt::Use_prps;
@@ -106,6 +110,8 @@ Namespace::readwrite_prepare_prp(bool read, l4_uint64_t slba, l4_uint64_t paddr,
   sqe->cdw13 = 0;
   sqe->cdw14 = 0;
   sqe->cdw15 = 0;
+  if (_iosq->_prps)
+    *prpp = _iosq->_prps->get<Prp_list_entry>(prp_list_start);
   return sqe;
 }
 
@@ -116,19 +122,18 @@ Namespace::readwrite_prepare_sgl(bool read, l4_uint64_t slba,
   auto *sqe = _iosq->produce();
   if (!sqe)
     return 0;
+  auto sgl_start = sqe->cid() * Queue::Ioq_sgls * sizeof(Sgl_desc);
   sqe->opc() = (read ? Iocs::Read : Iocs::Write);
   sqe->nsid = _nsid;
   sqe->psdt() = Psdt::Use_sgls;
   sqe->sgl1.sgl_id = Sgl_id::Last_segment_addr;
-  sqe->sgl1.addr =
-    _iosq->_sgls->pget(sqe->cid() * Queue::Ioq_sgls * sizeof(Sgl_desc));
+  sqe->sgl1.addr = _iosq->_sgls->pget(sgl_start);
   sqe->cdw10 = slba & 0xfffffffful;
   sqe->cdw11 = slba >> 32;
   sqe->cdw13 = 0;
   sqe->cdw14 = 0;
   sqe->cdw15 = 0;
-  *sglp = _iosq->_sgls->get<Sgl_desc>(sqe->cid() * Queue::Ioq_sgls
-                                      * sizeof(Sgl_desc));
+  *sglp = _iosq->_sgls->get<Sgl_desc>(sgl_start);
   return sqe;
 }
 

@@ -23,6 +23,7 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
   Queue::Sqe *sqe;
   l4_size_t sectors = 0;
   l4_size_t blocks = 0;
+  l4_size_t sz;
   bool read = (dir == L4Re::Dma_space::Direction::From_device ? true : false);
   if (_ns->ctl().supports_sgl())
     {
@@ -42,21 +43,57 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
           sgls[i].addr = b->dma_addr;
           sgls[i].len = b->num_sectors * sector_size();
         }
+
+      sz = sectors * sector_size();
     }
   else
     {
       // Fallback to using PRPs
+
+      Prp_list_entry *prps;
+
+      l4_assert(!block.next);
+
       sectors =
         std::min((l4_size_t)block.num_sectors, max_size() / sector_size());
       ++blocks;
-      sqe = _ns->readwrite_prepare_prp(read, sector, block.dma_addr,
-                                       sectors * sector_size());
+      sz = sectors * sector_size();
+      sqe = _ns->readwrite_prepare_prp(read, sector, block.dma_addr, sz, &prps);
+
       if (!sqe)
         return -L4_EBUSY;
+
+      // figure out what is covered by PRP0
+      l4_uint64_t paddr = l4_trunc_page(block.dma_addr + L4_PAGESIZE);
+      l4_size_t remains = 0;
+      if (sz >= (paddr - block.dma_addr))
+        remains = sz - (paddr - block.dma_addr);
+
+      // covered already by PRP1?
+      if (remains <= L4_PAGESIZE)
+        remains = 0;
+
+      // Construct the PRP List
+      for (auto i = 0u, p = 0u; remains && i < Queue::Prp_list_entries; i++)
+        {
+          // Check for the last entry in a page and link it to the next page.
+          if ((i % Queue::Prp_list_entries_per_page
+               == Queue::Prp_list_entries_per_page - 1)
+              && (remains > L4_PAGESIZE))
+            {
+              p++;
+              prps[i].addr = sqe->prp.prp2 + p * L4_PAGESIZE;
+              continue;
+            }
+          prps[i].addr = paddr;
+          paddr += L4_PAGESIZE;
+          remains -= cxx::min<l4_size_t>(remains, L4_PAGESIZE);
+        }
+
+      l4_assert(remains == 0);
     }
 
   // XXX: defer running of the callback to an Errand like the ahci-driver does?
-  l4_size_t sz = sectors * sector_size();
   Block_device::Inout_callback callback = cb; // capture a copy
   _ns->readwrite_submit(sqe, sectors - 1, blocks,
                         [callback, sz](l4_uint16_t status) {

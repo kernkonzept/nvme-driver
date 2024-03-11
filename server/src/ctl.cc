@@ -127,7 +127,7 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
   cc.iosqes() = 6; // 64 bytes
 
   cc.ams() = Regs::Ctl::Cc::Ams_rr;
-  cc.mps() = L4_PAGESHIFT - 12;
+  cc.mps() = L4_PAGESHIFT - Mps_base;
   if ((_cap.mpsmin() > cc.mps()) || (_cap.mpsmax() < cc.mps()))
     L4Re::chksys(-L4_ENOSYS, "Controller does not support the architectural page size");
 

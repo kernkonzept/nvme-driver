@@ -113,6 +113,14 @@ struct Sgl_desc
 static_assert(sizeof(Sgl_desc) == 16, "Sgl_desc is 16 bytes");
 static_assert(alignof(Sgl_desc) == 8, "Sgl_desc is qword aligned");
 
+struct Prp_list_entry
+{
+  l4_uint64_t addr;
+} __attribute__ ((aligned(8)));
+
+static_assert(sizeof(Prp_list_entry) == 8, "Prp_list_entry is 8 bytes");
+static_assert(alignof(Prp_list_entry) == 8, "Prp_list_entru is qword aligned");
+
 /** Controller Capabilities register of a NVMe Controller
  */
 struct Ctl_cap
