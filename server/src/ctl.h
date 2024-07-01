@@ -86,8 +86,8 @@ public:
   void add_ns(cxx::unique_ptr<Namespace> ns)
   { _nss.push_back(cxx::move(ns)); }
 
-  L4::Cap<L4Re::Dma_space> dma() const
-  { return _dma.get(); }
+  L4Re::Util::Shared_cap<L4Re::Dma_space> dma() const
+  { return _dma; }
 
   bool supports_sgl() const
   { return use_sgls && _sgls; }

@@ -14,20 +14,80 @@
 #include "ns.h"
 
 #include <l4/libblock-device/device.h>
+#include <l4/libblock-device/part_device.h>
+#include <l4/libblock-device/device_impl_dma.h>
 
 namespace Nvme {
 
-class Nvme_base_device
+class Base_device
 : public Block_device::Device,
   public Block_device::Device_discard_feature
 {
+public:
+  void set_dma_map_all(bool enable)
+  { _dma_map_all = enable; }
+
+  bool _dma_map_all = false;
+};
+
+class Base_parent_device: public Base_device
+{
+public:
+  virtual int dma_map_all(Block_device::Mem_region *, l4_addr_t, l4_size_t,
+                          L4Re::Dma_space::Direction,
+                          L4Re::Dma_space::Dma_addr *) = 0;
+
+  virtual int dma_map_single(Block_device::Mem_region *, l4_addr_t, l4_size_t,
+                             L4Re::Dma_space::Direction,
+                             L4Re::Dma_space::Dma_addr *) = 0;
+
+  virtual int dma_unmap_all(L4Re::Dma_space::Dma_addr, l4_size_t,
+                            L4Re::Dma_space::Direction) = 0;
+
+  virtual int dma_unmap_single(L4Re::Dma_space::Dma_addr, l4_size_t,
+                               L4Re::Dma_space::Direction) = 0;
+};
+
+using Base_part_device = Block_device::Partitioned_device<Nvme::Base_device>;
+
+class Part_device : public Base_part_device
+{
+public:
+  using Base_part_device::Base_part_device;
+
+private:
+  int dma_map(Block_device::Mem_region *region, l4_addr_t offset,
+              l4_size_t num_sectors, L4Re::Dma_space::Direction dir,
+              L4Re::Dma_space::Dma_addr *dma_addr) override
+  {
+    if (_dma_map_all)
+      return static_cast<Base_parent_device *>(parent())->dma_map_all(
+        region, offset, num_sectors, dir, dma_addr);
+    else
+      return static_cast<Base_parent_device *>(parent())->dma_map_single(
+        region, offset, num_sectors, dir, dma_addr);
+  }
+
+  int dma_unmap(L4Re::Dma_space::Dma_addr dma_addr, l4_size_t num_sectors,
+                L4Re::Dma_space::Direction dir) override
+  {
+    if (_dma_map_all)
+      return static_cast<Base_parent_device *>(parent())->dma_unmap_all(
+        dma_addr, num_sectors, dir);
+    else
+      return static_cast<Base_parent_device *>(parent())->dma_unmap_single(
+        dma_addr, num_sectors, dir);
+  }
 };
 
 class Nvme_device
-: public Block_device::Device_with_notification_domain<Nvme_base_device>
+: public Block_device::Device_with_notification_domain<Base_parent_device>,
+  public Block_device::Device_dma_map_all_impl<Nvme_device>
 {
 public:
-  Nvme_device(Namespace *ns) : _ns(cxx::move(ns))
+  Nvme_device(Namespace *ns)
+  : Block_device::Device_dma_map_all_impl<Nvme_device>(ns->ctl().dma()),
+    _ns(cxx::move(ns))
   {
     _hid = _ns->ctl().sn() + ":n" + std::to_string(_ns->nsid());
   }
@@ -96,21 +156,58 @@ public:
   void reset() override
   {} // TODO
 
-  int dma_map(Block_device::Mem_region *region, l4_addr_t offset,
+  int
+  dma_map_all(Block_device::Mem_region *region, l4_addr_t offset,
               l4_size_t num_sectors, L4Re::Dma_space::Direction dir,
-              L4Re::Dma_space::Dma_addr *phys) override
+              L4Re::Dma_space::Dma_addr *dma_addr) override
+  {
+    return Block_device::Device_dma_map_all_impl<Nvme_device>::dma_map_all(
+      region, offset, num_sectors, dir, dma_addr);
+  }
+
+  int
+  dma_map_single(Block_device::Mem_region *region, l4_addr_t offset,
+                 l4_size_t num_sectors, L4Re::Dma_space::Direction dir,
+                 L4Re::Dma_space::Dma_addr *dma_addr) override
   {
     l4_size_t size = num_sectors * sector_size();
     return _ns->ctl().dma()->map(L4::Ipc::make_cap_rw(region->ds()), offset,
                                  &size, L4Re::Dma_space::Attributes::None, dir,
-                                 phys);
+                                 dma_addr);
   }
 
-  int dma_unmap(L4Re::Dma_space::Dma_addr phys, l4_size_t num_sectors,
+  int
+  dma_unmap_all(L4Re::Dma_space::Dma_addr, l4_size_t,
+                L4Re::Dma_space::Direction) override
+  {
+    return L4_EOK;
+  }
+
+  int
+  dma_unmap_single(L4Re::Dma_space::Dma_addr dma_addr, l4_size_t num_sectors,
+                   L4Re::Dma_space::Direction dir) override
+  {
+    return _ns->ctl().dma()->unmap(dma_addr, num_sectors * sector_size(),
+                                   L4Re::Dma_space::Attributes::None, dir);
+  }
+
+  int dma_map(Block_device::Mem_region *region, l4_addr_t offset,
+              l4_size_t num_sectors, L4Re::Dma_space::Direction dir,
+              L4Re::Dma_space::Dma_addr *dma_addr) override
+  {
+    if (_dma_map_all)
+      return dma_map_all(region, offset, num_sectors, dir, dma_addr);
+    else
+      return dma_map_single(region, offset, num_sectors, dir, dma_addr);
+  }
+
+  int dma_unmap(L4Re::Dma_space::Dma_addr dma_addr, l4_size_t num_sectors,
                 L4Re::Dma_space::Direction dir) override
   {
-    return _ns->ctl().dma()->unmap(phys, num_sectors * sector_size(),
-                                   L4Re::Dma_space::Attributes::None, dir);
+    if (_dma_map_all)
+      return dma_unmap_all(dma_addr, num_sectors, dir);
+    else
+      return dma_unmap_single(dma_addr, num_sectors, dir);
   }
 
   int inout_data(l4_uint64_t sector,

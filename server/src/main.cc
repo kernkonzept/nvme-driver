@@ -44,14 +44,36 @@ static char const *const usage_str =
 " --nosgl            Disable support for SGLs\n"
 " --nomsi            Disable support for MSI interrupts\n"
 " --nomsix           Disable support for MSI-X interrupts\n"
-" --register-ds CAP  Register a trusted dataspace capability\n";
-
-using Base_device_mgr = Block_device::Device_mgr<
-  Nvme::Nvme_base_device,
-  Block_device::Partitionable_factory<Nvme::Nvme_base_device>>;
+" --register-ds CAP  Register a trusted dataspace capability\n"
+" --dma-map-all      Map the entire client dataspace permanently (default)\n"
+" --dma-map-per-req  Map/unmap client dataspace per request\n";
 
 using Ds_vector = std::vector<L4::Cap<L4Re::Dataspace>>;
 static std::shared_ptr<Ds_vector> trusted_dataspaces;
+
+struct Device_factory
+{
+  using Device_type = Nvme::Base_device;
+  using Client_type = Block_device::Virtio_client<Nvme::Base_device>;
+  using Part_device = Nvme::Part_device;
+
+  static cxx::unique_ptr<Client_type>
+  create_client(cxx::Ref_ptr<Device_type> const &dev, unsigned numds,
+                bool readonly)
+  {
+    return cxx::make_unique<Client_type>(dev, numds, readonly);
+  }
+
+  static cxx::Ref_ptr<Device_type>
+  create_partition(cxx::Ref_ptr<Device_type> const &dev, unsigned partition_id,
+                   Block_device::Partition_info const &pi)
+  {
+    return cxx::Ref_ptr<Device_type>(new Part_device(dev, partition_id, pi));
+  }
+};
+
+using Base_device_mgr = Block_device::Device_mgr<Nvme::Base_device,
+                                                 Device_factory>;
 
 class Blk_mgr
 : public Base_device_mgr,
@@ -89,6 +111,7 @@ public:
     std::string device;
     int num_ds = 2;
     bool readonly = false;
+    bool dma_map_all = true;
 
     for (L4::Ipc::Varg p: valist)
       {
@@ -120,6 +143,8 @@ public:
 
         if (strncmp(p.value<char const *>(), "read-only", p.length()) == 0)
           readonly = true;
+        else if (strncmp(p.value<char const *>(), "dma-map-per-req", p.length()) == 0)
+          dma_map_all = false;
       }
 
     if (device.empty())
@@ -131,7 +156,17 @@ public:
 
     L4::Cap<void> cap;
     int ret = create_dynamic_client(device, -1, num_ds, &cap, readonly,
-                                    [](Nvme::Nvme_base_device *) {},
+                                    [dma_map_all, device](Nvme::Base_device *b)
+      {
+        Dbg(Dbg::Warn).printf("%s for device '%s'.\033[m\n",
+                              dma_map_all ? "\033[31;1mDMA-map-all enabled (default)"
+                                          : "\033[32mDMA-map-all disabled",
+                              device.c_str());
+        if (auto *pd = dynamic_cast<Nvme::Part_device *>(b))
+          pd->set_dma_map_all(dma_map_all);
+        else
+          b->set_dma_map_all(dma_map_all);
+      },
                                     !trusted_dataspaces->empty(),
                                     trusted_dataspaces);
     if (ret >= 0)
@@ -218,8 +253,21 @@ struct Client_opts
             return false;
           }
 
+        // Copy parameters for lambda capture. The object itself is ephemeral!
+        std::string dev = device;
+        bool map_all = dma_map_all;
         blk_mgr->add_static_client(cap, device.c_str(), -1, ds_max, readonly,
-                                   [](Nvme::Nvme_base_device *) {},
+                                   [dev, map_all](Nvme::Base_device *b)
+         {
+           Dbg(Dbg::Warn).printf("%s for device '%s'\033[m\n",
+                                 map_all ? "\033[31;1mDMA-map-all enabled (default)"
+                                         : "\033[32mDMA-map-all disabled",
+                                 dev.c_str());
+           if (auto *pd = dynamic_cast<Nvme::Part_device *>(b))
+             pd->set_dma_map_all(map_all);
+           else
+             b->set_dma_map_all(map_all);
+         },
                                    !trusted_dataspaces->empty(),
                                    trusted_dataspaces);
       }
@@ -231,6 +279,7 @@ struct Client_opts
   std::string device;
   int ds_max = 2;
   bool readonly = false;
+  bool dma_map_all = true;
 };
 
 static Block_device::Errand::Errand_server server;
@@ -251,21 +300,25 @@ parse_args(int argc, char *const *argv)
     OPT_READONLY,
     OPT_NOSGL,
     OPT_NOMSI,
-    OPT_NOMSIX
+    OPT_NOMSIX,
+    OPT_DMA_MAP_ALL,
+    OPT_DMA_MAP_PER_REQ,
   };
 
   struct option const loptions[] =
   {
-    { "verbose",       no_argument,       NULL, 'v' },
-    { "quiet",         no_argument,       NULL, 'q' },
-    { "client",        required_argument, NULL,  OPT_CLIENT },
-    { "device",        required_argument, NULL,  OPT_DEVICE },
-    { "ds-max",        required_argument, NULL,  OPT_DS_MAX },
-    { "readonly",      no_argument,       NULL,  OPT_READONLY },
-    { "nosgl",         no_argument,       NULL,  OPT_NOSGL },
-    { "nomsi",         no_argument,       NULL,  OPT_NOMSI },
-    { "nomsix",        no_argument,       NULL,  OPT_NOMSIX },
-    { "register-ds",   required_argument, NULL, 'd'},
+    { "verbose",         no_argument,       NULL, 'v' },
+    { "quiet",           no_argument,       NULL, 'q' },
+    { "client",          required_argument, NULL, OPT_CLIENT },
+    { "device",          required_argument, NULL, OPT_DEVICE },
+    { "ds-max",          required_argument, NULL, OPT_DS_MAX },
+    { "readonly",        no_argument,       NULL, OPT_READONLY },
+    { "nosgl",           no_argument,       NULL, OPT_NOSGL },
+    { "nomsi",           no_argument,       NULL, OPT_NOMSI },
+    { "nomsix",          no_argument,       NULL, OPT_NOMSIX },
+    { "register-ds",     required_argument, NULL, 'd' },
+    { "dma-map-all",     no_argument,       NULL, OPT_DMA_MAP_ALL },
+    { "dma-map-per-req", no_argument,       NULL, OPT_DMA_MAP_PER_REQ },
   };
 
   Client_opts opts;
@@ -302,6 +355,12 @@ parse_args(int argc, char *const *argv)
           break;
         case OPT_READONLY:
           opts.readonly = true;
+          break;
+        case OPT_DMA_MAP_ALL:
+          opts.dma_map_all = true;
+          break;
+        case OPT_DMA_MAP_PER_REQ:
+          opts.dma_map_all = false;
           break;
         case OPT_NOSGL:
           Nvme::Ctl::use_sgls = false;
