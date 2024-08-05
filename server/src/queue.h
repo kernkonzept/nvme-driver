@@ -202,9 +202,10 @@ public:
     Sqe *sqe = _buf->get<Sqe>(_tail * _entry_size);
     _tail = wrap_around(_tail + 1);
 
-    // Clear all but the Command Identifier
-    memset((void *)sqe, 0, sizeof(l4_uint16_t));
-    memset((void *)&sqe->nsid, 0, sizeof(*sqe) - sizeof(sqe->cdw0));
+    // Clear all but preserve the Command Identifier
+    unsigned cid = sqe->cid();
+    memset((void *)sqe, 0, sizeof(*sqe));
+    sqe->cid() = cid;
     return sqe;
   }
 
