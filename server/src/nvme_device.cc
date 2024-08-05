@@ -20,7 +20,7 @@ Nvme::Nvme_device::inout_data(l4_uint64_t sector,
                               Block_device::Inout_callback const &cb,
                               L4Re::Dma_space::Direction dir)
 {
-  Queue::Sqe *sqe;
+  Queue::Sqe volatile *sqe;
   l4_size_t sectors = 0;
   l4_size_t blocks = 0;
   l4_size_t sz;

@@ -43,25 +43,25 @@ enum
 /// Submission Queue Entry
 struct Sqe
 {
-  volatile l4_uint32_t cdw0;
-  volatile l4_uint32_t nsid;
-  volatile l4_uint64_t _res;
-  volatile l4_uint64_t mptr;
+  l4_uint32_t cdw0;
+  l4_uint32_t nsid;
+  l4_uint64_t _res;
+  l4_uint64_t mptr;
   union
   {
     struct
     {
-      volatile l4_uint64_t prp1;
-      volatile l4_uint64_t prp2;
+      l4_uint64_t prp1;
+      l4_uint64_t prp2;
     } prp;
-    volatile Sgl_desc sgl1;
+    Sgl_desc sgl1;
   };
-  volatile l4_uint32_t cdw10;
-  volatile l4_uint32_t cdw11;
-  volatile l4_uint32_t cdw12;
-  volatile l4_uint32_t cdw13;
-  volatile l4_uint32_t cdw14;
-  volatile l4_uint32_t cdw15;
+  l4_uint32_t cdw10;
+  l4_uint32_t cdw11;
+  l4_uint32_t cdw12;
+  l4_uint32_t cdw13;
+  l4_uint32_t cdw14;
+  l4_uint32_t cdw15;
 
   CXX_BITFIELD_MEMBER(0, 7, opc, cdw0);    ///< Opcode
   CXX_BITFIELD_MEMBER(14, 15, psdt, cdw0); ///< PRP or SGL Data Transfer
@@ -98,10 +98,10 @@ struct Sqe
 /// Completion Queue Entry
 struct Cqe
 {
-  volatile l4_uint32_t dw0;
-  volatile l4_uint32_t dw1;
-  volatile l4_uint32_t dw2;
-  volatile l4_uint32_t dw3;
+  l4_uint32_t dw0;
+  l4_uint32_t dw1;
+  l4_uint32_t dw2;
+  l4_uint32_t dw3;
 
   CXX_BITFIELD_MEMBER_RO(16, 31, sqid, dw2); ///< SQ Identifier
   CXX_BITFIELD_MEMBER_RO(0, 15, sqhd, dw2);  ///< SQ Head Pointer
@@ -167,7 +167,7 @@ public:
   {
     for (auto i = 0u; i < size; i++)
       {
-        Sqe *sqe = _buf->get<Sqe>(i * _entry_size);
+        Sqe volatile *sqe = _buf->get<Sqe>(i * _entry_size);
         sqe->cid() = i;
       }
 
@@ -189,7 +189,7 @@ public:
 
   bool is_full() const { return _head == wrap_around(_tail + 1); }
 
-  Sqe *produce()
+  Sqe volatile *produce()
   {
     if (is_full())
       return 0;
@@ -199,7 +199,7 @@ public:
         // use this entry again.
         return 0;
       }
-    Sqe *sqe = _buf->get<Sqe>(_tail * _entry_size);
+    Sqe volatile *sqe = _buf->get<Sqe>(_tail * _entry_size);
     _tail = wrap_around(_tail + 1);
 
     // Clear all but preserve the Command Identifier
@@ -233,9 +233,9 @@ public:
   {
   }
 
-  Cqe *consume()
+  Cqe volatile *consume()
   {
-    Cqe *cqe = _buf->get<Cqe>(_head * _entry_size);
+    Cqe volatile *cqe = _buf->get<Cqe>(_head * _entry_size);
     if (cqe->p() == _p)
       {
         _head = wrap_around(_head + 1);

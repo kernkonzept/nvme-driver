@@ -155,7 +155,7 @@ Ctl::Ctl(L4vbus::Pci_dev const &dev, cxx::Ref_ptr<Icu> icu,
 void
 Ctl::handle_irq()
 {
-  Queue::Cqe *cqe = _acq->consume();
+  Queue::Cqe volatile *cqe = _acq->consume();
   if (cqe)
     {
       assert(cqe->sqid() == Aq_id);
