@@ -98,10 +98,12 @@ public:
             return -L4_EINVAL;
           }
 
-        if (parse_string_param(p, "device=", &device))
+        std::string device_param;
+        if (parse_string_param(p, "device=", &device_param))
           {
-            std::transform(device.begin(), device.end(), device.begin(),
-                           [](unsigned char c){ return std::toupper(c); });
+            long ret = parse_device_name(device_param, device);
+            if (ret < 0)
+              return ret;
             continue;
           }
 
@@ -202,7 +204,7 @@ struct Client_opts
   {
     if (capname)
       {
-        if (!device)
+        if (device.empty())
           {
             Err().printf("No device for client '%s' given. "
                          "Please specify a device.\n", capname);
@@ -216,7 +218,7 @@ struct Client_opts
             return false;
           }
 
-        blk_mgr->add_static_client(cap, device, -1, ds_max, readonly,
+        blk_mgr->add_static_client(cap, device.c_str(), -1, ds_max, readonly,
                                    [](Nvme::Nvme_base_device *) {},
                                    !trusted_dataspaces->empty(),
                                    trusted_dataspaces);
@@ -226,7 +228,7 @@ struct Client_opts
   }
 
   const char *capname = nullptr;
-  const char *device = nullptr;
+  std::string device;
   int ds_max = 2;
   bool readonly = false;
 };
@@ -289,7 +291,11 @@ parse_args(int argc, char *const *argv)
           opts.capname = optarg;
           break;
         case OPT_DEVICE:
-          opts.device = optarg;
+          if (Blk_mgr::parse_device_name(optarg, opts.device) < 0)
+            {
+              Dbg::warn().printf("Invalid device name parameter.\n");
+              return -1;
+            }
           break;
         case OPT_DS_MAX:
           opts.ds_max = atoi(optarg);
