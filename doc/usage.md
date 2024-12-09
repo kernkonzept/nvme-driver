@@ -1,4 +1,7 @@
-# NVMe server   {#l4re_servers_nvme_driver}
+# NVMe server {#l4re_servers_nvme_driver}
+
+[comment]: # (This is a generated file. Do not change it.)
+[comment]: # (Instead, change capdb.yml.)
 
 The NVMe server is a driver for PCI Express NVMe controllers.
 
@@ -27,14 +30,16 @@ this project into your `pkg` directory. The resulting binary is called
 
 The NVMe server can be started with Lua like this:
 
-    local nvme_bus = L4.default_loader:new_channel();
-    L4.default_loader:start({
-      caps = {
-        vbus = vbus_nvme,
-        svr = nvme_bus:svr(),
-      },
-    },
-    "rom/nvme-drv");
+```lua
+local nvme_bus = L4.default_loader:new_channel();
+L4.default_loader:start({
+  caps = {
+    vbus = vbus_nvme,
+    svr = nvme_bus:svr(),
+  },
+},
+"rom/nvme-drv");
+```
 
 First an IPC gate (`nvme_bus`) is created which is used between the NVMe server
 and a client to request access to a particular disk or partition. The
@@ -45,98 +50,154 @@ The NVMe server needs access to a virtual bus capability (`vbus`). On the
 virtual bus the NVMe server searches for NVMe compliant storage controllers.
 Please see io's documentation about how to setup a virtual bus.
 
-### Options
+
+## Capabilities
+
+* `vbus`
+
+  Virtual bus capability
+
+  Mandatory capability.
+
+* `dataspace`
+
+  Trusted dataspaces
+
+  Multiple capability names can be provided by the `--register-ds` command line parameter.
+
+* `client`
+
+  Static client
+
+  Multiple capability names can be provided by the `--client` command line parameter.
+
+* `svr`
+
+  Server Capability of application. Endpoint for IPC calls
+
+  Mandatory capability.
+
+
+## Command Line Options
 
 In the example above the NVMe server is started in its default configuration.
 To customize the configuration of the NVMe-server it accepts the following
 command line options:
 
-* `-v`
+* `-v`, `--verbose`
 
-  Enable verbose mode. You can repeat this option up to three times to increase
-  verbosity up to trace level.
+  Enable verbose mode. You can repeat this option to increase verbosity up
+  to trace level.
 
-* `-q`
+  Can be used up to 3 times.
+
+  Flag. True if provided.
+
+* `-q`, `--quiet`
 
   This option enables the quiet mode. All output is silenced.
 
+  Flag. True if provided.
+
 * `--client <cap_name>`
 
-  This option starts a new static client option context. The following
-  `device`, `ds-max` and `readonly` options belong to this context until a new
-  client option context is created.
+  Connect a static client.
 
-  The option parameter is the name of a local IPC gate capability with server
-  rights.
+  Can be used multiple times.
 
-* `--device <UUID | SN:n<NAMESPACE_ID>>`
+  Name of a provided capability with server rights that adheres to the ipc protocol.
 
-  This option denotes the partition UUID or serial number of the preceding
-  `client` option followed by a colon, letter 'n' and the identifier of the
-  requested NVMe namespace.
+  This parameter opens a scope for the following subparameters:
 
-* `--ds-max <max>`
+  * `--device <UUID | <SN>:n<NAMESPACE_ID>>`
 
-  This option sets the upper limit of the number of dataspaces the client is
-  able to register with the NVMe server for virtio DMA.
+    This option denotes the partition UUID or serial number of the preceding
+    `client` option followed by a colon, letter 'n' and the identifier of the
+    requested NVMe namespace.
 
-* `--readonly`
+    String value.
 
-  This option sets the access to disks or partitions to read only for the
-  preceding `client` option.
+  * `--ds-max <max>`
+
+    This option sets the upper limit of the number of dataspaces the client is
+    able to register with the NVMe server for virtio DMA.
+
+    Numerical value.
+
+  * `--readonly`
+
+    This option sets the access to disks or partitions to read only for the
+    preceding `client` option.
+
+    Flag. True if provided.
 
 * `--nosgl`
 
   This option disables support for SGLs.
 
+  Flag. True if provided.
+
 * `--nomsi`
 
   This option disables support for MSI interrupts.
+
+  Flag. True if provided.
 
 * `--nomsix`
 
   This option disables support for MSI-X interrupts.
 
+  Flag. True if provided.
+
 * `-d <cap_name>`, `--register-ds <cap_name>`
+
   This option registers a trusted dataspace capability. If this option gets
   used, it is not possible to communicate to the driver via dataspaces other
   than the registered ones. Can be used multiple times for multiple dataspaces.
 
-  The option parameter is the name of a dataspace capability.
+  The option's parameter is the name of a dataspace capability.
 
-## Connecting a client
+  Can be used multiple times.
+
+  Name of a provided capability that adheres to the dataspace protocol.
+
+## Virtio block host
 
 Prior to connecting a client to a virtual block session it has to be created
 using the following Lua function. It has to be called on the client side of the
 IPC gate capability whose server side is bound to the NVMe server.
 
-    create(obj_type, "device=<UUID | SN:n<NAMESPACE_ID>>", "ds-max=<max>", "read-only")
+Call:   `create(0, "device=<UUID | <SN>:n<NAMESPACE_ID>>" [, "ds-max=<max>", "read-only"])`
 
-* `obj_type`
-
-  The type of object that should be created by the server. The type must be a
-  positive integer. Currently the following objects are supported:
-  * `0`: Virtio block host
-
-* `"device=<UUID | SN>"`
+* `"device=<UUID | <SN>:n<NAMESPACE_ID>>"`
 
   This string denotes either a partition UUID, or a disk serial number the
   client wants to be exported via the Virtio block interface followed by a
   colon, letter 'n' and the identifier of the requested NVMe namespace.
+
+  String value.
 
 * `"ds-max=<max>"`
 
   Specifies the upper limit of the number of dataspaces the client is allowed
   to register with the NVMe server for virtio DMA.
 
+  Numerical value.
+
+  Default: `2`
+
 * `"read-only"`
 
   This string sets the access to disks or partitions to read only for the
   client.
 
+  Flag. True if provided.
+
 If the `create()` call is successful a new capability which references an NVMe
 virtio device is returned. A client uses this capability to communicate with
 the NVMe server using the Virtio block protocol.
+
+
 
 ## Examples
 
@@ -145,22 +206,29 @@ below.
 
 * Request a partition with the given UUID
 
-      vda1 = nvme_bus:create(0, "ds-max=5", "device=88E59675-4DC8-469A-98E4-B7B021DC7FBE")
+```lua
+vda1 = nvme_bus:create(0, "ds-max=5", "device=88E59675-4DC8-469A-98E4-B7B021DC7FBE")
+```
 
 * Request complete namespace with the given serial number
 
-      vda = nvme_bus:create(0, "ds-max=4", "device=1234:n1")
+```lua
+vda = nvme_bus:create(0, "ds-max=4", "device=1234:n1")
+```
 
 * A more elaborate example with a static client. The client uses the client
   side of the `nvme_cl1` capability to communicate with the NVMe server.
 
-      local nvme_cl1 = L4.default_loader:new_channel();
-      local nvme_bus = L4.default_loader:new_channel();
-      L4.default_loader:start({
-        caps = {
-          vbus = vbus_nvme,
-          svr = nvme_bus:svr(),
-          cl1 = nvme_cl1:svr(),
-        },
-      },
-      "rom/nvme-drv --client cl1 --device 88E59675-4DC8-469A-98E4-B7B021DC7FBE --ds-max 5");
+  ```
+  local nvme_cl1 = L4.default_loader:new_channel();
+  local nvme_bus = L4.default_loader:new_channel();
+  L4.default_loader:start({
+    caps = {
+      vbus = vbus_nvme,
+      svr = nvme_bus:svr(),
+      cl1 = nvme_cl1:svr(),
+    },
+  },
+  "rom/nvme-drv --client cl1 --device 88E59675-4DC8-469A-98E4-B7B021DC7FBE --ds-max 5");
+  ```
+
