@@ -472,7 +472,7 @@ main(int argc, char *const *argv)
   Block_device::Errand::set_server_iface(&server);
   setup_hardware();
 
-  Dbg::trace().printf("Beginning server loop...\n");
+  Dbg::info().printf("Beginning server loop...\n");
   server.loop();
 
   return 0;
