@@ -520,7 +520,8 @@ Ctl::enable_quirks()
     _quirks.delay_after_disable() = true;
 
   // 144d:a80a Samsung Electronics Co Ltd NVMe SSD Controller PM9A1/PM9A3/980PRO
-  if ((vendor_id == 0x144d) && (device_id == 0xa80a))
+  // 144d:a80c Samsung Electronics Co Ltd NVMe SSD Controller S4LV008[Pascal]
+  if ((vendor_id == 0x144d) && ((device_id == 0xa80a) || (device_id == 0xa80c)))
     {
       _quirks.delay_after_enable() = true;
       _quirks.delay_after_enable_ms = 60;
