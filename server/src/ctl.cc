@@ -30,6 +30,7 @@
 #include <l4/util/util.h>
 
 static Dbg trace(Dbg::Trace, "ctl");
+static Dbg warn(Dbg::Warn, "ctl");
 
 namespace Nvme {
 
@@ -541,6 +542,16 @@ Ctl::enable_quirks()
       _quirks.delay_after_enable_ms = 3;
     }
 
+  // Some (new, unknown) NVMe devices also require quirks. Here we enable a
+  // default quirk. This shall make controller initialization more robust at
+  // the cost of a small general slow down.
+  if (!_quirks.raw)
+    {
+      warn.printf("Unknown NVMe controller. Enabling default quirks.\n");
+      _quirks.delay_after_enable() = true;
+      _quirks.delay_after_enable_ms = 60;
+      _quirks.delay_after_disable() = true;
+    }
   trace.printf("Enabled quirks: %#x\n", (unsigned int) _quirks.raw);
 }
 
