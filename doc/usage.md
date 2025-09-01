@@ -20,36 +20,6 @@ static configuration is given priority over dynamically connecting clients and
 configured while the service starts. Dynamic clients can connect and disconnect
 during runtime of the NVMe server.
 
-## Building and Configuration
-
-The NVMe server can be built using the L4Re build system. Just place
-this project into your `pkg` directory. The resulting binary is called
-`nvme-drv`
-
-## Starting the service
-
-The NVMe server can be started with Lua like this:
-
-```lua
-local nvme_bus = L4.default_loader:new_channel();
-L4.default_loader:start({
-  caps = {
-    vbus = vbus_nvme,
-    svr = nvme_bus:svr(),
-  },
-},
-"rom/nvme-drv");
-```
-
-First an IPC gate (`nvme_bus`) is created which is used between the NVMe server
-and a client to request access to a particular disk or partition. The
-server-side is assigned to the mandatory `svr` capability of the NVMe server.
-See the section below on how to configure access to a disk or partition.
-
-The NVMe server needs access to a virtual bus capability (`vbus`). On the
-virtual bus the NVMe server searches for NVMe compliant storage controllers.
-Please see io's documentation about how to setup a virtual bus.
-
 
 ## Capabilities
 
@@ -63,13 +33,15 @@ Please see io's documentation about how to setup a virtual bus.
 
   Trusted dataspaces
 
-  Multiple capability names can be provided by the `--register-ds` command line parameter.
+  Multiple capability names can be provided by the `--register-ds` command line
+  parameter.
 
 * `client`
 
   Static client
 
-  Multiple capability names can be provided by the `--client` command line parameter.
+  Multiple capability names can be provided by the `--client` command line
+  parameter.
 
 * `svr`
 
@@ -80,14 +52,14 @@ Please see io's documentation about how to setup a virtual bus.
 
 ## Command Line Options
 
-In the example above the NVMe server is started in its default configuration.
-To customize the configuration of the NVMe-server it accepts the following
-command line options:
+In the example above the NVMe server is started in its default configuration. To
+customize the configuration of the NVMe-server it accepts the following command
+line options:
 
 * `-v`, `--verbose`
 
-  Enable verbose mode. You can repeat this option to increase verbosity up
-  to trace level.
+  Enable verbose mode. You can repeat this option to increase verbosity up to
+  trace level.
 
   Can be used up to 3 times.
 
@@ -105,7 +77,8 @@ command line options:
 
   Can be used multiple times.
 
-  Name of a provided capability with server rights that adheres to the ipc protocol.
+  Name of a provided capability with server rights that adheres to the ipc
+  protocol.
 
   This parameter opens a scope for the following subparameters:
 
@@ -161,13 +134,43 @@ command line options:
 
   Name of a provided capability that adheres to the dataspace protocol.
 
+## Building and Configuration
+
+The NVMe server can be built using the L4Re build system. Just place this
+project into your `pkg` directory. The resulting binary is called `nvme-drv`
+
+## Starting the service
+
+The NVMe server can be started with Lua like this:
+
+```lua
+local nvme_bus = L4.default_loader:new_channel();
+L4.default_loader:start({
+  caps = {
+    vbus = vbus_nvme,
+    svr = nvme_bus:svr(),
+  },
+},
+"rom/nvme-drv");
+```
+
+First an IPC gate (`nvme_bus`) is created which is used between the NVMe server
+and a client to request access to a particular disk or partition. The server-
+side is assigned to the mandatory `svr` capability of the NVMe server. See the
+section below on how to configure access to a disk or partition.
+
+The NVMe server needs access to a virtual bus capability (`vbus`). On the
+virtual bus the NVMe server searches for NVMe compliant storage controllers.
+Please see io's documentation about how to setup a virtual bus.
+
 ## Virtio block host
 
 Prior to connecting a client to a virtual block session it has to be created
 using the following Lua function. It has to be called on the client side of the
 IPC gate capability whose server side is bound to the NVMe server.
 
-Call:   `create(0, "device=<UUID | <SN>:n<NAMESPACE_ID>>" [, "ds-max=<max>", "read-only"])`
+Call:   `create(0, "device=<UUID | <SN>:n<NAMESPACE_ID>>" [, "ds-max=<max>",
+"read-only"])`
 
 * `"device=<UUID | <SN>:n<NAMESPACE_ID>>"`
 
@@ -179,10 +182,11 @@ Call:   `create(0, "device=<UUID | <SN>:n<NAMESPACE_ID>>" [, "ds-max=<max>", "re
 
 * `"ds-max=<max>"`
 
-  Specifies the upper limit of the number of dataspaces the client is allowed
-  to register with the NVMe server for virtio DMA.
+  Specifies the upper limit of the number of dataspaces the client is allowed to
+  register with the NVMe server for virtio DMA.
 
   Numerical value.
+    * In the range of 1 to 256 inclusive
 
   Default: `2`
 
@@ -194,8 +198,8 @@ Call:   `create(0, "device=<UUID | <SN>:n<NAMESPACE_ID>>" [, "ds-max=<max>", "re
   Flag. True if provided.
 
 If the `create()` call is successful a new capability which references an NVMe
-virtio device is returned. A client uses this capability to communicate with
-the NVMe server using the Virtio block protocol.
+virtio device is returned. A client uses this capability to communicate with the
+NVMe server using the Virtio block protocol.
 
 
 
@@ -216,10 +220,10 @@ vda1 = nvme_bus:create(0, "ds-max=5", "device=88E59675-4DC8-469A-98E4-B7B021DC7F
 vda = nvme_bus:create(0, "ds-max=4", "device=1234:n1")
 ```
 
-* A more elaborate example with a static client. The client uses the client
-  side of the `nvme_cl1` capability to communicate with the NVMe server.
+* A more elaborate example with a static client. The client uses the client side
+of the `nvme_cl1` capability to communicate with the NVMe server.
 
-  ```
+  ```lua
   local nvme_cl1 = L4.default_loader:new_channel();
   local nvme_bus = L4.default_loader:new_channel();
   L4.default_loader:start({
