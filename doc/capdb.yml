@@ -45,7 +45,6 @@ cmds:
         desc: Connect a static client.
         type: cap
         cap-name: 'client'
-        protocol: 'ipc'
         multiple: true
         needs-server-right: true
       - name: 'device'
@@ -87,7 +86,6 @@ cmds:
       The option's parameter is the name of a dataspace capability.
     type: cap
     cap-name: 'dataspace'
-    protocol: 'dataspace'
     multiple: true
 text-after-cmds: |
   ## Building and Configuration
@@ -128,13 +126,11 @@ caps:
     desc: Trusted dataspaces
     protocol: 'dataspace'
     multiple: true
-    provided-by-cmd: 'register-ds'
   - name: 'client'
     desc: Static client
     protocol: 'ipc'
     needs-server-right: true
     multiple: true
-    provided-by-cmd: 'client'
 
 server-cap-name: svr
 factory:
