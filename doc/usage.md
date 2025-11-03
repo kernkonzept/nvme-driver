@@ -82,11 +82,23 @@ line options:
 
   This parameter opens a scope for the following subparameters:
 
-  * `--device <UUID | <SN>:n<NAMESPACE_ID>>`
+  * `--device <<SN>:n<NSID> | <SN>:n<NSID>:<PARTNUM> | [partuuid:]<UUID> |
+  [partlabel:]<LABEL>>`
 
-    This option denotes the partition UUID or serial number of the preceding
-    `client` option followed by a colon, letter 'n' and the identifier of the
-    requested NVMe namespace.
+    This option denotes either the NVMe namespace, or a partition on such a
+    namespace to be exported for the client specified in the preceding `client`
+    option.
+
+    The NVMe namespace is specified via the NVMe controller serial number SN
+    followed by a colon followed by letter 'n' followed by the NSID (namespace
+    ID). The controller serial number can be found e.g. in the NVMe server's
+    output or in the controller's sysfs directory in Linux.
+
+    The partition can be given either by the combination of the controller's SN
+    followed by a colon followed by letter 'n' followed by the NSID followed by
+    a colon followed by the partition number PARTNUM, or by the partition's UUID
+    or label. Both 'partuuid:' and 'partlabel:' strings are optional and help to
+    disambiguate the device matching if necessary.
 
     String value.
 
@@ -169,14 +181,25 @@ Prior to connecting a client to a virtual block session it has to be created
 using the following Lua function. It has to be called on the client side of the
 IPC gate capability whose server side is bound to the NVMe server.
 
-Call:   `create(0, "device=<UUID | <SN>:n<NAMESPACE_ID>>" [, "ds-max=<max>",
-"read-only"])`
+Call:   `create(0, "device=<<SN>:n<NSID> | <SN>:n<NSID>:<PARTNUM> |
+[partuuid:]<UUID> | [partlabel:]<LABEL>>" [, "ds-max=<max>", "read-only"])`
 
-* `"device=<UUID | <SN>:n<NAMESPACE_ID>>"`
+* `"device=<<SN>:n<NSID> | <SN>:n<NSID>:<PARTNUM> | [partuuid:]<UUID> |
+[partlabel:]<LABEL>>"`
 
-  This string denotes either a partition UUID, or a disk serial number the
-  client wants to be exported via the Virtio block interface followed by a
-  colon, letter 'n' and the identifier of the requested NVMe namespace.
+  This string denotes either the NVMe namespace, or a partition on such a
+  namespace that the client wants to be exported via the Virtio block interface.
+
+  The NVMe namespace is specified via the NVMe controller serial number SN
+  followed by a colon followed by letter 'n' followed by the NSID (namespace
+  ID). The controller serial number can be found e.g. in the NVMe server's
+  output or in the controller's sysfs directory in Linux.
+
+  The partition can be given either by the combination of the controller's SN
+  followed by a colon followed by letter 'n' followed by the NSID followed by a
+  colon followed by the partition number PARTNUM, or by the partition's UUID or
+  label. Both 'partuuid:' and 'partlabel:' strings are optional and help to
+  disambiguate the device matching if necessary.
 
   String value.
 
@@ -208,16 +231,49 @@ NVMe server using the Virtio block protocol.
 A couple of examples on how to request different disks or partitions are listed
 below.
 
+* Request an entire NVMe namespace
+
+Assume the NVMe server reported an NVMe controller with the following serial
+number (running in QEMU):
+
+```
+Serial Number: 1234
+```
+
+A client can connect to NSID 1 on this controller like this:
+
+```lua
+vda = nvme_bus:create(0, "ds-max=5", "device=1234:n1")
+```
+
+* Request a partition using a partition number
+
+Assume the NVMe server reported an NVMe controller with the following serial
+number (running in QEMU):
+
+```
+Serial Number: 1234
+```
+
+A client can connect to partition 2 on namespace 1 on this controller like this:
+
+```lua
+vda = nvme_bus:create(0, "ds-max=5", "device=1234:n1:2")
+```
+
 * Request a partition with the given UUID
 
 ```lua
-vda1 = nvme_bus:create(0, "ds-max=5", "device=88E59675-4DC8-469A-98E4-B7B021DC7FBE")
+vda = nvme_bus:create(0, "ds-max=5", "device=partuuid:88E59675-4DC8-469A-98E4-B7B021DC7FBE")
 ```
 
-* Request complete namespace with the given serial number
+* Request a partition using a label
+
+Assume there is a partition with label 'foobar'. A client can connect to it
+using the following snippet:
 
 ```lua
-vda = nvme_bus:create(0, "ds-max=4", "device=1234:n1")
+vda = nvme_bus:create(0, "ds-max=5", "device=partlabel:foobar")
 ```
 
 * A more elaborate example with a static client. The client uses the client side
