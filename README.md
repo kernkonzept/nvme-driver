@@ -1,22 +1,19 @@
-# L4Re NVMe server
+# L4Re NVMe Driver
 
-nvme-driver is an L4Re server that consists of two parts. On one side there is
-the hardware driver itself that communicates with the NVMe controller and
-provides the interrupt handling. On the other side a libblock-device interface
-has been implemented for interfacing with L4virtio clients.
+nvme-driver is a driver for NVMEe devices such as SSDs, making
+them available to L4Re applications and VMs via Virtio.
 
 # Documentation
 
-This package is part of the L4Re Operating System Framework. For documentation
-and build instructions see the [L4Re
-wiki](https://kernkonzept.com/L4Re/guides/l4re).
+This package is part of the L4Re operating system. For documentation and
+build instructions please refer to [l4re.org](https://l4re.org).
 
 # Contributions
 
-We welcome contributions. Please see our contributors guide on
-[how to contribute](https://kernkonzept.com/L4Re/contributing/l4re).
+We welcome contributions. Please see the
+[contributors guide](https://l4re.org/contributing/).
 
 # License
 
-Detailed licensing and copyright information can be found in
-the [LICENSE](LICENSE.spdx) file.
+Detailed licensing and copyright information can be found in the
+[LICENSE](LICENSE.spdx) file.
