@@ -5,8 +5,9 @@ them available to L4Re applications and VMs via Virtio.
 
 # Documentation
 
-This package is part of the L4Re operating system. For documentation and
-build instructions please refer to [l4re.org](https://l4re.org).
+This package is part of the L4Re Operating System Framework. For
+documentation and build instructions please refer to
+[l4re.org](https://l4re.org).
 
 # Contributions
 
