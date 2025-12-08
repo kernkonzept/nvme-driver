@@ -374,7 +374,7 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
   sqe->cns() = Cns::Identify_namespace;
   sqe->nvmsetid() = 0;
 
-  auto cb = [=](l4_uint16_t status) {
+  auto cb = [this, in, nn, n, callback](l4_uint16_t status) {
     if (status)
       {
         printf("Namespace Identify command failed with status %u\n", status);
@@ -444,7 +444,7 @@ Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> callback)
   sqe->cns() = Cns::Identify_controller;
   sqe->nvmsetid() = 0;
 
-  auto cb = [=](l4_uint16_t status) {
+  auto cb = [this, callback, ic](l4_uint16_t status) {
     if (status)
       {
         trace.printf("Identify_controller command failed with status=%u\n", status);

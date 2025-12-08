@@ -42,8 +42,9 @@ Namespace::async_loop_init(
 
   _msi = _ctl.allocate_msi(this);
 
-  _iocq =
-    _ctl.create_iocq(qid(), Queue::Ioq_size, _msi, [=](l4_uint16_t status) {
+  _iocq = _ctl.create_iocq(
+    qid(), Queue::Ioq_size, _msi,
+    [this, nsids, callback](l4_uint16_t status) {
       if (status)
         {
           trace.printf(
@@ -61,7 +62,7 @@ Namespace::async_loop_init(
         }
       _iosq = _ctl.create_iosq(
         qid(), Queue::Ioq_size, _ctl.supports_sgl() ? Queue::Ioq_sgls : 0,
-        [=](l4_uint16_t status) {
+        [this, nsids, callback](l4_uint16_t status) {
 
           // Start identifying the next NSID
           if (_nsid + 1 < nsids)
