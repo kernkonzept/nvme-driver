@@ -162,7 +162,7 @@ public:
   : Queue(size, y, dstrd, regs, dma, L4Re::Dma_space::Direction::To_device),
     _tail(0), _in_flight(0), _free_hint(0)
   {
-    _callbacks.reserve(_size);
+    _callbacks.resize(_size);
 
     if (sgls)
       {
