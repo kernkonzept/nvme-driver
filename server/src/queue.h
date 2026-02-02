@@ -180,7 +180,7 @@ public:
 
   bool is_full() const { return _head == wrap_around(_tail + 1); }
 
-  Sqe *produce(Callback cb)
+  Sqe volatile *produce(Callback cb)
   {
     if (is_full() || _in_flight >= _size)
       return 0;
@@ -192,7 +192,7 @@ public:
       cid = wrap_around(cid + 1);
     _callbacks[cid] = std::move(cb);
 
-    Sqe *sqe = _buf->get<Sqe>(_tail * _entry_size);
+    Sqe volatile *sqe = _buf->get<Sqe>(_tail * _entry_size);
     _tail = wrap_around(_tail + 1);
 
     memset((void *)sqe, 0, sizeof(*sqe));
