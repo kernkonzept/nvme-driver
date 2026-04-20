@@ -82,7 +82,7 @@ private:
      *
      * \return The number of requested vectors.
      */
-    unsigned msis_supported()
+    unsigned msis_supported() const
     { return 1 << ctrl.mmc(); }
 
     Pci_msi::Ctrl ctrl;
@@ -92,7 +92,7 @@ private:
   {
     using Cap::Cap;
 
-    unsigned msixs_supported()
+    unsigned msixs_supported() const
     { return ctrl.ts() + 1; }
 
     Pci_msix::Ctrl ctrl;
@@ -136,7 +136,7 @@ public:
    * \retval 0  Device does not support MSIs.
    * \retval >0 Number of MSIs supported / requested by the device
    */
-  unsigned msis_supported()
+  unsigned msis_supported() const
   {
     return (_msi_cap.id == Msi) ? _msi_cap.msis_supported() : 0;
   }
@@ -145,7 +145,7 @@ public:
    * \retval 0  Device does not support MSI-Xs.
    * \retval >0 Number of MSI-Xs supported / requested by the device
    */
-  unsigned msixs_supported()
+  unsigned msixs_supported() const
   {
     return (_msix_cap.id == Msi_x) ? _msix_cap.msixs_supported() : 0;
   }
