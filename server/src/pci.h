@@ -259,8 +259,9 @@ public:
             bar |= (l4_uint64_t)bar2 << 32;
           }
 
+        unsigned table_size = _msix_cap.ctrl.ts() + 1;
         Iomem msix_table_mem(
-          (bar & ~0xfull) + table_offset.offset(), _msix_cap.ctrl.ts() * 16,
+          (bar & ~0xfull) + table_offset.offset(), table_size * 16,
           L4::cap_reinterpret_cast<L4Re::Dataspace>(_dev.bus_cap()));
         _msix_table = std::move(msix_table_mem);
       }
