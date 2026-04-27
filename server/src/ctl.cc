@@ -184,7 +184,7 @@ Ctl::register_interrupt_handler()
   auto cap = L4Re::chkcap(_registry->register_irq_obj(this),
                           "Registering IRQ server object.");
 
-  int irq = -1;
+  long irq = -1;
   unsigned char polarity = 0;
 
   if (msis_enabled())
@@ -193,7 +193,7 @@ Ctl::register_interrupt_handler()
 
       if (irq >= 0)
         {
-          trace.printf("Allocated MSI vector: %d\n", irq);
+          trace.printf("Allocated MSI vector: %ld\n", irq);
 
           irq |= L4::Icu::F_msi;
 
@@ -213,7 +213,7 @@ Ctl::register_interrupt_handler()
   int unmask_via_icu = l4_error(_icu->icu()->bind(irq, cap));
   L4Re::chksys(unmask_via_icu, "Binding interrupt to ICU.");
 
-  trace.printf("IRQ[%x] unmask: %s\n", irq,
+  trace.printf("IRQ[%lx] unmask: %s\n", irq,
                unmask_via_icu ? "via ICU" : "direct");
 
   if (irq & L4::Icu::F_msi)
@@ -222,13 +222,13 @@ Ctl::register_interrupt_handler()
       l4_uint64_t source = _dev.dev_handle() | L4vbus::Icu::Src_dev_handle;
       L4Re::chksys(_icu->icu()->msi_info(irq, source, &msi_info),
                    "Retrieving MSI info.");
-      Dbg::info().printf("MSI info: vector=0x%x addr=%llx, data=%x\n",
+      Dbg::info().printf("MSI info: vector=0x%lx addr=%llx, data=%x\n",
                          irq, msi_info.msi_addr, msi_info.msi_data);
 
       enable_msi(irq, msi_info);
     }
 
-  Dbg::info().printf("Device: interrupt : %x trigger: %d, polarity: %d\n",
+  Dbg::info().printf("Device: interrupt : %lx trigger: %d, polarity: %d\n",
                      irq, (int)_irq_trigger_type, (int)polarity);
   trace.printf("Device: interrupt mask: %x\n",
                _regs.r<32>(Regs::Ctl::Intms).read());
@@ -244,7 +244,7 @@ Ctl::register_interrupt_handler()
 
   _regs.r<32>(Regs::Ctl::Intmc).write(~0U);
 
-  trace.printf("Attached to interupt %x\n", irq);
+  trace.printf("Attached to interupt %lx\n", irq);
 }
 
 cxx::unique_ptr<Queue::Completion_queue>
