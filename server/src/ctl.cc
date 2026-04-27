@@ -233,8 +233,6 @@ Ctl::register_interrupt_handler()
   trace.printf("Device: interrupt mask: %x\n",
                _regs.r<32>(Regs::Ctl::Intms).read());
 
-  _regs.r<32>(Regs::Ctl::Intms).write(~0U);
-
   if (unmask_via_icu)
     L4Re::chksys(l4_ipc_error(_icu->icu()->unmask(irq), l4_utcb()),
                  "Unmasking interrupt");
