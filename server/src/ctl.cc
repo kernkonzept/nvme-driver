@@ -240,7 +240,10 @@ Ctl::register_interrupt_handler()
     L4Re::chksys(l4_ipc_error(cap->unmask(), l4_utcb()),
                  "Unmasking interrupt");
 
-  _regs.r<32>(Regs::Ctl::Intmc).write(~0U);
+  // The Interrupt Mask Set/Clear registers must not be written when MSI-X
+  // has been configured.
+  if (!(use_msixs && _pci_dev->msixs_supported()))
+    _regs.r<32>(Regs::Ctl::Intmc).write(~0U);
 
   trace.printf("Attached to interupt %lx\n", irq);
 }
