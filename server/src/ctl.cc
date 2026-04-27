@@ -225,20 +225,29 @@ Ctl::register_interrupt_handler()
       Dbg::info().printf("MSI info: vector=0x%lx addr=%llx, data=%x\n",
                          irq, msi_info.msi_addr, msi_info.msi_data);
 
+      // Must unmask _after_ msi_info because this wires the L4::Irq with the
+      // MSI vector in the kernel.
+      L4Re::chksys(l4_ipc_error(cap->unmask(), l4_utcb()),
+                   "Unmasking interrupt");
+
+      // Enable the MSI after the kernel IRQ was unmasked so that no interrupt
+      // can be lost.
       enable_msi(irq, msi_info);
+    }
+  else
+    {
+      if (unmask_via_icu)
+        L4Re::chksys(l4_ipc_error(_icu->icu()->unmask(irq), l4_utcb()),
+                     "Unmasking interrupt");
+      else
+        L4Re::chksys(l4_ipc_error(cap->unmask(), l4_utcb()),
+                     "Unmasking interrupt");
     }
 
   Dbg::info().printf("Device: interrupt : %lx trigger: %d, polarity: %d\n",
                      irq, (int)_irq_trigger_type, (int)polarity);
   trace.printf("Device: interrupt mask: %x\n",
                _regs.r<32>(Regs::Ctl::Intms).read());
-
-  if (unmask_via_icu)
-    L4Re::chksys(l4_ipc_error(_icu->icu()->unmask(irq), l4_utcb()),
-                 "Unmasking interrupt");
-  else
-    L4Re::chksys(l4_ipc_error(cap->unmask(), l4_utcb()),
-                 "Unmasking interrupt");
 
   // The Interrupt Mask Set/Clear registers must not be written when MSI-X
   // has been configured.
@@ -298,10 +307,10 @@ unsigned Ctl::allocate_msi(Nvme::Namespace *ns)
           Dbg::info().printf("MSI info: vector=0x%lx addr=%llx, data=%x\n", msi,
                              msi_info.msi_addr, msi_info.msi_data);
 
-          enable_msi(msi, msi_info);
-
           L4Re::chksys(l4_ipc_error(cap->unmask(), l4_utcb()),
                        "Unmasking interrupt");
+
+          enable_msi(msi, msi_info);
         }
       else
         iv = 0;
