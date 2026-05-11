@@ -517,7 +517,11 @@ Ctl::enable_quirks()
 
   // 15b7:5011 Sandisk Corp WD PC SN810 / Black SN850 NVMe SSD
   if ((vendor_id == 0x15b7) && (device_id == 0x5011))
-    _quirks.delay_after_disable() = true;
+    {
+      _quirks.delay_after_disable() = true;
+      _quirks.delay_after_enable() = true;
+      _quirks.delay_after_enable_ms = 1;
+    }
 
   // 144d:a80a Samsung Electronics Co Ltd NVMe SSD Controller PM9A1/PM9A3/980PRO
   // 144d:a80c Samsung Electronics Co Ltd NVMe SSD Controller S4LV008[Pascal]
