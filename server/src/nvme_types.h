@@ -208,7 +208,7 @@ enum Regs
   Intms = 0x0cU, ///< Interrupt Mask Set
   Intmc = 0x10U, ///< Interrupt Mask Clear
   Cc = 0x14U,    ///< Controller Configuration
-  Csts = 0x14U,  ///< Controller Status
+  Csts = 0x1cU,  ///< Controller Status
   Nssr = 0x20U,  ///< NVM Subsystem Reset
   Aqa = 0x24U,   ///< Admin Queue Attributes
   Asq = 0x28U,   ///< Amdin Submission Queue Base Address
