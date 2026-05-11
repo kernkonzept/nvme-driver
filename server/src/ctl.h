@@ -183,9 +183,9 @@ private:
   struct Quirks
   {
     l4_uint8_t raw;
-    CXX_BITFIELD_MEMBER(1, 2, delay_after_enable,
+    CXX_BITFIELD_MEMBER(1, 1, delay_after_enable,
                         raw); ///< Controller needs a delay after it's enbaled
-    CXX_BITFIELD_MEMBER(0, 1, delay_after_disable,
+    CXX_BITFIELD_MEMBER(0, 0, delay_after_disable,
                         raw); ///< Controller needs a delay after it's disabled
 
     unsigned delay_after_enable_ms;
