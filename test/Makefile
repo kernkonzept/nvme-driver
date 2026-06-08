@@ -1,5 +1,5 @@
-PKGDIR = .
-L4DIR ?= $(PKGDIR)/../../..
+PKGDIR = ..
+L4DIR ?= $(PKGDIR)/../..
 
 TARGET_test = $(wildcard [a-z0-9]*)
 
