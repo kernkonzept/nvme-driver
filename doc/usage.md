@@ -3,6 +3,9 @@
 [comment]: # (This is a generated file. Do not change it.)
 [comment]: # (Instead, change capdb.yml.)
 
+
+## Description {#l4re_servers_nvme_driver_description}
+
 The NVMe server is a driver for PCI Express NVMe controllers.
 
 The NVMe server is capable of exposing entire disks (i.e. NVMe namespaces) (by
@@ -21,7 +24,8 @@ configured while the service starts. Dynamic clients can connect and disconnect
 during runtime of the NVMe server.
 
 
-## Capabilities
+<hr>
+## Capabilities {#l4re_servers_nvme_driver_capabilities}
 
 * `vbus`
 
@@ -50,7 +54,8 @@ during runtime of the NVMe server.
   Mandatory capability.
 
 
-## Command Line Options
+<hr>
+## Command Line Options {#l4re_servers_nvme_driver_cmdline_options}
 
 In the example above the NVMe server is started in its default configuration. To
 customize the configuration of the NVMe-server it accepts the following command
@@ -146,6 +151,7 @@ line options:
 
   Name of a provided capability that adheres to the dataspace protocol.
 
+<hr>
 ## Building and Configuration
 
 The NVMe server can be built using the L4Re build system. Just place this
@@ -175,7 +181,7 @@ The NVMe server needs access to a virtual bus capability (`vbus`). On the
 virtual bus the NVMe server searches for NVMe compliant storage controllers.
 Please see io's documentation about how to setup a virtual bus.
 
-## Virtio block host
+## Virtio block host {#l4re_servers_nvme_driver_param_virtio_block_host}
 
 Prior to connecting a client to a virtual block session it has to be created
 using the following Lua function. It has to be called on the client side of the
@@ -226,7 +232,8 @@ NVMe server using the Virtio block protocol.
 
 
 
-## Examples
+<hr>
+## Examples {#l4re_servers_nvme_driver_examples}
 
 A couple of examples on how to request different disks or partitions are listed
 below.
