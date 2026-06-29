@@ -49,9 +49,8 @@ during runtime of the NVMe server.
 
 * `svr`
 
-  Server Capability of application. Endpoint for IPC calls
-
-  Mandatory capability.
+  Server capability providing clients access to a factory interface for creating
+  dynamic clients.
 
 
 <hr>
@@ -174,7 +173,7 @@ L4.default_loader:start({
 
 First an IPC gate (`nvme_bus`) is created which is used between the NVMe server
 and a client to request access to a particular disk or partition. The server-
-side is assigned to the mandatory `svr` capability of the NVMe server. See the
+side is assigned to the optional `svr` capability of the NVMe server. See the
 section below on how to configure access to a disk or partition.
 
 The NVMe server needs access to a virtual bus capability (`vbus`). On the

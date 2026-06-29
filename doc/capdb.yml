@@ -124,7 +124,7 @@ text-after-cmds: |
 
   First an IPC gate (`nvme_bus`) is created which is used between the NVMe
   server and a client to request access to a particular disk or partition. The
-  server-side is assigned to the mandatory `svr` capability of the NVMe server.
+  server-side is assigned to the optional `svr` capability of the NVMe server.
   See the section below on how to configure access to a disk or partition.
 
   The NVMe server needs access to a virtual bus capability (`vbus`). On the
@@ -144,8 +144,12 @@ caps:
     protocol: 'ipc'
     needs-server-right: true
     multiple: true
-
-server-cap-name: svr
+  - name: 'svr'
+    desc: |
+      Server capability providing clients access to a factory interface for
+      creating dynamic clients.
+    factory: true
+    mandatory: false
 factory:
   - obj-type: '0'
     return-type: Virtio_block_host
