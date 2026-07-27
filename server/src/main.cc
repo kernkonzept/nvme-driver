@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <stdio.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <vector>
@@ -19,6 +20,7 @@
 #include <l4/re/util/br_manager>
 #include <l4/re/util/object_registry>
 #include <l4/re/util/shared_cap>
+#include <l4/re/dataspace>
 #include <l4/vbus/vbus>
 #include <l4/vbus/vbus_pci>
 
@@ -328,7 +330,14 @@ parse_args(int argc, char *const *argv)
     {
       int opt = getopt_long(argc, argv, "vqd:", loptions, NULL);
       if (opt == -1)
-        break;
+        {
+          if (optind < argc)
+            {
+              Err().printf("Unknown parameter '%s'\n", argv[optind]);
+              return -1;
+            }
+          break;
+        }
 
       switch (opt)
         {
@@ -348,7 +357,7 @@ parse_args(int argc, char *const *argv)
         case OPT_DEVICE:
           if (Blk_mgr::parse_device_name(optarg, opts.device) < 0)
             {
-              Dbg::warn().printf("Invalid device name parameter.\n");
+              Err().printf("Invalid device name parameter.\n");
               return -1;
             }
           break;
@@ -376,18 +385,32 @@ parse_args(int argc, char *const *argv)
         case 'd':
           {
             L4::Cap<L4Re::Dataspace> ds =
-              L4Re::chkcap(L4Re::Env::env()->get_cap<L4Re::Dataspace>(optarg),
-                           "Find a dataspace capability.\n");
+              L4Re::Env::env()->get_cap<L4Re::Dataspace>(optarg);
+            if (!ds.is_valid())
+              {
+                Err().printf("Did not find capability for dataspace '%s'. "
+                             "Likely due to a wrong configuration of the"
+                             " capability table.\n", optarg);
+                return -1;
+              }
+
             trusted_dataspaces->push_back(ds);
             break;
           }
         default:
-          Dbg::warn().printf(usage_str, argv[0]);
-          return -1;
+          {
+            if (opt == ':')
+              Err().printf("Required argument missing to option '%s'.\n",
+                           argv[optind - 1]);
+            else if (opt == '?')
+              Err().printf("Unrecognized option '%s'.\n", argv[optind - 1]);
+            return -1;
+          }
         }
     }
 
   if (!opts.add_client(&drv))
+    // add_client prints error messages itself
     return 1;
 
   Dbg::set_level(debug_level);
@@ -524,9 +547,13 @@ main(int argc, char *const *argv)
 
   trusted_dataspaces = std::make_shared<Ds_vector>();
 
-  int arg_idx = parse_args(argc, argv);
-  if (arg_idx < 0)
-    return arg_idx;
+  if (int err_code = parse_args(argc, argv) < 0)
+    {
+      Err().printf("Error during command line argument parsing: %d\n",
+                   err_code);
+      Err().printf(usage_str, argv[0]);
+      return EXIT_FAILURE;
+    }
 
   Dbg::info().printf("NVMe driver says hello.\n");
 
