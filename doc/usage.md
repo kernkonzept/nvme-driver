@@ -23,6 +23,12 @@ static configuration is given priority over dynamically connecting clients and
 configured while the service starts. Dynamic clients can connect and disconnect
 during runtime of the NVMe server.
 
+## Factory {#l4re_nvme_driver_factory}
+
+The factory of the NVMe server allows creation of the following objects:
+
+- Virtio block host, the VirtIO block interface to a single block device
+
 
 <hr>
 ## Capabilities {#l4re_servers_nvme_driver_capabilities}
