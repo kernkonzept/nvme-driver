@@ -216,7 +216,7 @@ public:
                  "Writing MSI Message Address register");
     if (_msi_cap.ctrl.large())
       {
-        cfg_write_32(_msi_cap.addr + 8, msi_info.msi_addr & ~0xffffffffULL,
+        cfg_write_32(_msi_cap.addr + 8, msi_info.msi_addr >> 32,
                      "Writing MSI Message Upper Address register");
         cfg_write_16(_msi_cap.addr + 0xc,
                      msi_info.msi_data & ~(msis_supported() - 1),
