@@ -128,6 +128,15 @@ public:
         if (_ns->ctl().mdts())
           max_size = cxx::min(max_size, ps << _ns->ctl().mdts());
       }
+
+    // The NLB field of the Read/Write commands is 16 bits wide, i.e. one
+    // command can transfer at most 65536 logical blocks. Make sure that even a
+    // request using all allowed segments stays within that limit. This is only
+    // relevant if the controller does not impose an MDTS limit of its own.
+    l4_uint64_t nlb_limit = l4_uint64_t{65536} * sector_size() / max_segments();
+    if (nlb_limit < max_size)
+      max_size = nlb_limit;
+
     return max_size;
   }
 
