@@ -357,7 +357,7 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
   // namespaces.  We workaround that by implementing the for-loop within the
   // nesting structure of the callbacks.
 
-  auto cb = [=](l4_uint16_t status) {
+  auto cb = [this, nn, n, callback, in](l4_uint16_t status) {
     if (status)
       {
         printf("Namespace Identify command failed with status %u\n", status);
@@ -426,7 +426,7 @@ Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> callback)
     cxx::make_ref_obj<Inout_buffer>(4096, _dma,
                                     L4Re::Dma_space::Direction::From_device);
 
-  auto cb = [=](l4_uint16_t status) {
+  auto cb = [this, callback, ic](l4_uint16_t status) {
     if (status)
       {
         trace.printf("Identify_controller command failed with status=%u\n", status);
