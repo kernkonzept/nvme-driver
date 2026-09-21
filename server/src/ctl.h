@@ -129,7 +129,7 @@ public:
   cxx::unique_ptr<Queue::Submission_queue>
   create_iosq(l4_uint16_t id, l4_size_t size, l4_size_t sgls, Callback cb);
   void
-  identify_namespace(l4_uint32_t n, l4_uint32_t nn,
+  identify_namespace(l4_uint32_t nn, l4_uint32_t n,
                      std::function<void(cxx::unique_ptr<Namespace>)> callback);
 
 private:
