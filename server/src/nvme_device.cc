@@ -128,6 +128,12 @@ Nvme::Nvme_device::discard(l4_uint64_t offset,
   l4_assert(!block.next.get());
   (void)discard;
 
+  // The NLB field of the Write Zeroes command encodes the number of logical
+  // blocks minus one, so an empty range cannot be expressed and would wrap
+  // around to the maximum transfer of 65536 blocks.
+  if (block.num_sectors == 0 || block.num_sectors > 65536)
+    return -L4_EIO;
+
   Block_device::Inout_callback callback = cb; // capture a copy
   bool sub = _ns->write_zeroes(offset + block.sector, block.num_sectors - 1,
                                block.flags & Block_device::Inout_f_unmap,
