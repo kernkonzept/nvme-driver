@@ -382,9 +382,18 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
           {
             l4_uint32_t lbaf =
               *in->get<l4_uint32_t>(Cns_in::Lbaf0 + (flbas & 0xf) * 4);
-            if ((lbaf & 0xffffu) == 0)
+             l4_uint8_t lbads = (lbaf >> 16) & 0xffu;
+            if (lbaf & 0xffffu)
+              trace.printf("LBAF uses metadata, skipping namespace %u\n", n);
+            // The NVMe specification requires the LBA data size to be at least
+            // 512 bytes. Smaller (or absurdly large) values would break the
+            // sector size arithmetic throughout the whole stack.
+            else if (lbads < 9 || lbads >= sizeof(l4_size_t) * 8)
+              trace.printf("Invalid LBA data size 2^%u, skipping namespace %u\n",
+                           lbads, n);
+            else
               {
-                l4_size_t lba_sz = (1ULL << ((lbaf >> 16) & 0xffu));
+                l4_size_t lba_sz = (1ULL << lbads);
                 trace.printf("LBA size: %zu\n", lba_sz);
 
                 skipped = false;
@@ -392,8 +401,6 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
                   cxx::make_unique<Nvme::Namespace>(*this, n, lba_sz, in);
                 ns.release()->async_loop_init(nn, callback);
               }
-            else
-              trace.printf("LBAF uses metadata, skipping namespace %u\n", n);
           }
         else
           trace.printf("Invalid TLBAS, skipping namespace %u\n", n);
