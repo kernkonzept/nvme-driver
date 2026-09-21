@@ -7,6 +7,8 @@
 
 #include <algorithm>
 
+#include <l4/libblock-device/errand.h>
+
 #include "debug.h"
 #include "nvme_device.h"
 #include "nvme_types.h"
@@ -115,7 +117,11 @@ Nvme::Nvme_device::flush(Block_device::Inout_callback const &cb)
   // The NVMe driver does not enable the Volatile Write Cache in the controller
   // (if present) and neither it nor libblock-device implements a software block
   // cache, so there is nothing to flush at this point.
-  cb(0, 0);
+
+  // The callback must not be run before this function has returned!
+  Block_device::Inout_callback callback = cb; // capture a copy
+  Block_device::Errand::schedule([callback]() { callback(0, 0); }, 0);
+
   return L4_EOK;
 }
 
