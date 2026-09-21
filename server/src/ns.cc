@@ -17,8 +17,7 @@ namespace Nvme {
 
 Namespace::Namespace(Ctl &ctl, l4_uint32_t nsid, l4_size_t lba_sz,
                      cxx::Ref_ptr<Inout_buffer> const &in)
-: _callback(nullptr),
-  _ctl(ctl),
+: _ctl(ctl),
   _msi(0),
   _nsid(nsid),
   _lba_sz(lba_sz),
@@ -36,15 +35,14 @@ Namespace::~Namespace()
 
 void
 Namespace::async_loop_init(
-  l4_uint32_t nsids, std::function<void(cxx::unique_ptr<Namespace>)> callback)
+  l4_uint32_t nsids, std::function<void(cxx::unique_ptr<Namespace>)> ns_cb,
+  std::function<void()> done_cb)
 {
-  _callback = callback;
-
   _msi = _ctl.allocate_msi(this);
 
   _iocq = _ctl.create_iocq(
     qid(), Queue::Ioq_size, _msi,
-    [this, nsids, callback](l4_uint16_t status) {
+    [this, nsids, ns_cb, done_cb](l4_uint16_t status) {
       if (status)
         {
           trace.printf(
@@ -52,8 +50,10 @@ Namespace::async_loop_init(
             status);
 
           // Start identifying the next NSID
-          if (_nsid + 1 < nsids)
-            _ctl.identify_namespace(nsids, _nsid + 1, callback);
+          if (_nsid + 1 <= nsids)
+            _ctl.identify_namespace(nsids, _nsid + 1, ns_cb, done_cb);
+          else
+            done_cb();
 
           // Self-destruct
           auto del = cxx::unique_ptr<Namespace>(this);
@@ -62,11 +62,11 @@ Namespace::async_loop_init(
         }
       _iosq = _ctl.create_iosq(
         qid(), Queue::Ioq_size, _ctl.supports_sgl() ? Queue::Ioq_sgls : 0,
-        [this, nsids, callback](l4_uint16_t status) {
+        [this, nsids, ns_cb, done_cb](l4_uint16_t status) {
 
           // Start identifying the next NSID
-          if (_nsid + 1 < nsids)
-            _ctl.identify_namespace(nsids, _nsid + 1, callback);
+          if (_nsid + 1 <= nsids)
+            _ctl.identify_namespace(nsids, _nsid + 1, ns_cb, done_cb);
 
           if (status)
             {
@@ -75,10 +75,21 @@ Namespace::async_loop_init(
                 status);
               // Self-destruct
               auto del = cxx::unique_ptr<Namespace>(this);
+
+              // This was the last namespace.
+              if (_nsid == nsids)
+                done_cb();
+
               return;
             }
 
-          _callback(cxx::unique_ptr<Namespace>(this));
+          // The namespace has been completely identified and set-up, we
+          // can finally call the namespace callback for it.
+          ns_cb(cxx::unique_ptr<Namespace>(this));
+
+          // This was the last namespace.
+          if (_nsid == nsids)
+            done_cb();
         });
     });
 }

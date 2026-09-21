@@ -345,7 +345,8 @@ Ctl::create_iosq(l4_uint16_t id, l4_size_t size, l4_size_t sgls, Callback cb)
 
 void
 Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
-                        std::function<void(cxx::unique_ptr<Namespace>)> callback)
+                        std::function<void(cxx::unique_ptr<Namespace>)> ns_cb,
+                        std::function<void()> done_cb)
 {
   auto in =
     cxx::make_ref_obj<Inout_buffer>(4096, _dma,
@@ -357,10 +358,17 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
   // namespaces.  We workaround that by implementing the for-loop within the
   // nesting structure of the callbacks.
 
-  auto cb = [this, nn, n, callback, in](l4_uint16_t status) {
+  auto cb = [this, nn, n, ns_cb, done_cb, in](l4_uint16_t status) {
     if (status)
       {
-        printf("Namespace Identify command failed with status %u\n", status);
+        printf("Namespace Identify command for NSID %u failed with status %u\n",
+               n, status);
+
+        if (n + 1 <= nn)
+          identify_namespace(nn, n + 1, ns_cb, done_cb);
+        else
+          done_cb();
+
         return;
       }
 
@@ -399,7 +407,7 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
                 skipped = false;
                 auto ns =
                   cxx::make_unique<Nvme::Namespace>(*this, n, lba_sz, in);
-                ns.release()->async_loop_init(nn, callback);
+                ns.release()->async_loop_init(nn, ns_cb, done_cb);
               }
           }
         else
@@ -410,8 +418,13 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
 
     in->unmap();
 
-    if (skipped && n + 1 < nn)
-      identify_namespace(nn, n + 1, callback);
+    if (skipped)
+      {
+        if (n + 1 <= nn)
+          identify_namespace(nn, n + 1, ns_cb, done_cb);
+        else
+          done_cb();
+      }
   };
 
   auto *sqe = _asq->produce(cb);
@@ -427,16 +440,18 @@ Ctl::identify_namespace(l4_uint32_t nn, l4_uint32_t n,
 }
 
 void
-Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> callback)
+Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> ns_cb,
+              std::function<void()> done_cb)
 {
   auto ic =
     cxx::make_ref_obj<Inout_buffer>(4096, _dma,
                                     L4Re::Dma_space::Direction::From_device);
 
-  auto cb = [this, callback, ic](l4_uint16_t status) {
+  auto cb = [this, ns_cb, done_cb, ic](l4_uint16_t status) {
     if (status)
       {
         trace.printf("Identify_controller command failed with status=%u\n", status);
+        done_cb();
         return;
       }
 
@@ -466,7 +481,7 @@ Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> callback)
     //
     // Note this is done as an asynchronous for-loop because we keep the
     // size of the admin queue as small as possible.
-    identify_namespace(nn, 1, callback);
+    identify_namespace(nn, 1, ns_cb, done_cb);
   };
 
   auto *sqe = _asq->produce(cb);

@@ -25,9 +25,9 @@ public:
 
   ~Namespace();
 
-  void
-  async_loop_init(l4_uint32_t nsids,
-                  std::function<void(cxx::unique_ptr<Namespace>)> callback);
+  void async_loop_init(l4_uint32_t nsids,
+                       std::function<void(cxx::unique_ptr<Namespace>)> ns_cb,
+                       std::function<void()> done_cb);
 
   Ctl const &ctl() const
   { return _ctl; }
@@ -80,9 +80,6 @@ private:
     l4_assert(_nsid < 65536);
     return _nsid;
   }
-
-  /// Callback to be called when the initialization of the namespace is complete
-  std::function<void(cxx::unique_ptr<Namespace>)> _callback;
 
   Ctl &_ctl;
 

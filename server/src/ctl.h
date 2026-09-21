@@ -70,9 +70,12 @@ public:
    * Identify the controller and the namespaces and initialize the ones that are
    * found.
    *
-   * \param callback Function called for each active namespace.
+   * \param ns_cb     Function called for each active namespace.
+   * \param done_cb   Function called once the entire identification of the
+   *                  controller is completed.
    */
-  void identify(std::function<void(cxx::unique_ptr<Namespace>)> callback);
+  void identify(std::function<void(cxx::unique_ptr<Namespace>)> ns_cb,
+                std::function<void()> done_cb);
 
   /**
    * Test if a VBUS device is a NVMe controller.
@@ -130,7 +133,8 @@ public:
   create_iosq(l4_uint16_t id, l4_size_t size, l4_size_t sgls, Callback cb);
   void
   identify_namespace(l4_uint32_t nn, l4_uint32_t n,
-                     std::function<void(cxx::unique_ptr<Namespace>)> callback);
+                     std::function<void(cxx::unique_ptr<Namespace>)> ns_cb,
+                     std::function<void()> done_cb);
 
 private:
   l4_uint32_t cfg_read(l4_uint32_t reg) const

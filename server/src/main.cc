@@ -432,7 +432,7 @@ device_scan_finished()
   if (!server.registry()->register_obj(&drv, "svr").is_valid())
     Dbg::warn().printf("Capability 'svr' not found. No dynamic clients accepted.\n");
   else
-    Dbg::trace().printf("Device now accepts new clients.\n");
+    Dbg::trace().printf("Service now accepts new clients.\n");
 }
 
 static L4Re::Util::Shared_cap<L4Re::Dma_space>
@@ -515,9 +515,9 @@ device_discovery(L4::Cap<L4vbus::Vbus> bus, cxx::Ref_ptr<Nvme::Icu> icu)
               {
                 printf("Making NSID %u visible to clients\n", ns->nsid());
                 drv.add_disk(cxx::make_ref_obj<Nvme::Nvme_device>(ns.get()),
-                             device_scan_finished);
+                             [](){});
                 ct->add_ns(cxx::move(ns));
-              });
+              }, device_scan_finished);
         }
     }
 
