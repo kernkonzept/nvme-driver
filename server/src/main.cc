@@ -363,6 +363,11 @@ parse_args(int argc, char *const *argv)
           break;
         case OPT_DS_MAX:
           opts.ds_max = atoi(optarg);
+          if (opts.ds_max <= 0 || opts.ds_max > 256)
+            {
+              Err().printf("Invalid range for parameter 'ds-max'.\n");
+              return -1;
+            }
           break;
         case OPT_READONLY:
           opts.readonly = true;
