@@ -507,15 +507,23 @@ device_discovery(L4::Cap<L4vbus::Vbus> bus, cxx::Ref_ptr<Nvme::Icu> icu)
               continue;
             }
 
+          // Add a reference for the controller identification in progress.
+          // This reference will be dropped after the controller finishes
+          // identification and all its namespaces are discovered.
           ++devices_in_scan;
 
           auto ct = _ctls.back().get();
           ct->identify(
             [=](cxx::unique_ptr<Nvme::Namespace> ns)
               {
+                // Add a reference for the potential disk partition scan in
+                // progress. It will be dropped once all disk partitions of this
+                // namespace are discovered.
+                ++devices_in_scan;
+
                 printf("Making NSID %u visible to clients\n", ns->nsid());
                 drv.add_disk(cxx::make_ref_obj<Nvme::Nvme_device>(ns.get()),
-                             [](){});
+                             device_scan_finished);
                 ct->add_ns(cxx::move(ns));
               }, device_scan_finished);
         }
