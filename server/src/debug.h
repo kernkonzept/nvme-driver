@@ -25,19 +25,19 @@ public:
     Steptrace = 8
   };
 
-  Dbg(unsigned long l = Info, char const *subsys = "")
+  Dbg(unsigned long l = Info, char const *subsys = nullptr)
   : L4Re::Util::Dbg(l, "NVMe", subsys) {}
 
-  static Dbg warn(char const *subsys = "")
+  static Dbg warn(char const *subsys = nullptr)
   { return Dbg(Dbg::Warn, subsys); }
 
-  static Dbg info(char const *subsys = "")
+  static Dbg info(char const *subsys = nullptr)
   { return Dbg(Dbg::Info, subsys); }
 
-  static Dbg trace(char const *subsys = "")
+  static Dbg trace(char const *subsys = nullptr)
   { return Dbg(Dbg::Trace, subsys); }
 
-  static Dbg steptrace(char const *subsys = "")
+  static Dbg steptrace(char const *subsys = nullptr)
   { return Dbg(Dbg::Steptrace, subsys); }
 };
 
