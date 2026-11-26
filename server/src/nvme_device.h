@@ -155,9 +155,18 @@ public:
     di.max_discard_sectors = 0;
     di.max_discard_seg = 0;
     di.discard_sector_alignment = 0;
-    di.max_write_zeroes_sectors = 65536;
-    di.max_write_zeroes_seg = 1;
-    di.write_zeroes_may_unmap = _ns->dlfeat().deallocwz();
+    if (_ns->ctl().supports_write_zeroes())
+      {
+        di.max_write_zeroes_sectors = 65536;
+        di.max_write_zeroes_seg = 1;
+        di.write_zeroes_may_unmap = _ns->dlfeat().deallocwz();
+      }
+    else
+      {
+        di.max_write_zeroes_sectors = 0;
+        di.max_write_zeroes_seg = 0;
+        di.write_zeroes_may_unmap = false;
+      }
 
     return di;
   }

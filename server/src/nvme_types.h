@@ -67,7 +67,14 @@ enum Cns_ic
   Mdts = 77u, ///< Maximum Data Transfer Size
   Cntlid = 78u, ///< Controller ID
   Nn = 516u, ///< Number of Namespaces
+  Oncs = 520u, ///< Optional NVM Command Support
   Sgls = 536u, ///< SGL Support
+};
+
+/// Optional NVM Command Support bits
+enum Oncs_bits
+{
+  Oncs_write_zeroes = 1u << 3, ///< Write Zeroes command supported
 };
 
 /** Deallocate Logical Block Features
