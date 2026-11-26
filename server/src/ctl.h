@@ -127,6 +127,9 @@ public:
   l4_uint8_t mdts() const
   { return _mdts; }
 
+  bool supports_write_zeroes() const
+  { return _oncs & Oncs_write_zeroes; }
+
   cxx::unique_ptr<Queue::Completion_queue>
   create_iocq(l4_uint16_t id, l4_size_t size, unsigned iv, Callback cb);
   cxx::unique_ptr<Queue::Submission_queue>
@@ -176,6 +179,9 @@ private:
   std::string _sn;
 
   l4_uint8_t _mdts;
+
+  /// Optional NVM Command Support
+  l4_uint16_t _oncs = 0;
 
   // Admin Completion Queue
   cxx::unique_ptr<Queue::Completion_queue> _acq;

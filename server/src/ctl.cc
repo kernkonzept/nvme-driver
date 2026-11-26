@@ -471,6 +471,10 @@ Ctl::identify(std::function<void(cxx::unique_ptr<Namespace>)> ns_cb,
     _sgls = (*ic->get<l4_uint32_t>(Cns_ic::Sgls) & 0x3) != 0;
     printf("SGL Support: %s\n", _sgls ? "yes" : "no");
 
+    _oncs = *ic->get<l4_uint16_t>(Cns_ic::Oncs);
+    printf("Write Zeroes Support: %s\n",
+           supports_write_zeroes() ? "yes" : "no");
+
     l4_uint32_t nn = *ic->get<l4_uint32_t>(Cns_ic::Nn);
 
     printf("Number of Namespaces: %d\n", nn);
